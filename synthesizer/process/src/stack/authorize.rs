@@ -36,6 +36,16 @@ impl<N: Network> Stack<N> {
 
         // Compute the request.
         println!("Compute the request....");
+        /*
+         * TODO (ab): First pass through just return message from Request::sign then create second path that goes back into sign
+         * but takes in message in the function signature. It sounds as if we're going to need 2 different frost_signs?
+         * 1. for before we have a message constructed so allow Request::sign to construct the message for us
+         * 2. for when we have the message constructed. we will need to pass it back into sign as there is other important stuff in there it seems.
+         * Unless we can create an auxiliary function that solely handles message returning? would be a cleaner approach. Then we could really only have
+         * 1 frost_authorize function. If we don't have message, create message via auxiliary function then return. If we do then proceed as normal into Request::sign but our
+         * Request::frost_sign which takes in message as a param.
+         */
+
         let request = Request::sign(private_key, *self.program.id(), function_name, inputs, &input_types, rng)?;
         lap!(timer, "Compute the request");
         // Initialize the authorization.
@@ -54,4 +64,18 @@ impl<N: Network> Stack<N> {
         // Return the authorization.
         Ok(authorization)
     }
+
+    // pub fn frost_authorize<A: circuit::Aleo<Network = N>, R: Rng + CryptoRng>(
+    //     &self,
+    //     private_key: &PrivateKey<N>,
+    //     function_name: impl TryInto<Identifier<N>>,
+    //     inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
+    //     rng: &mut R, // todo (ab): may need to rethink return here
+    // ) -> Result<Authorization<N>> {
+    //     /*
+    //     * create new method return_input_message
+    //     * if we don't have a message, get the message and return
+    //     * if we do have a message, proceed as normal to Request::sign()
+    //     */
+    // }
 }

@@ -208,6 +208,7 @@ impl<N: Network> StackExecute<N> for Stack<N> {
         // Store the inputs.
         function.inputs().iter().map(|i| i.register()).zip_eq(request.inputs()).try_for_each(|(register, input)| {
             // If the circuit is in execute mode, then store the console input.
+            println!("Input: {:?}", input.eject_value());
             if let CallStack::Execute(..) = registers.call_stack() {
                 // Assign the console input to the register.
                 registers.store(self, register, input.eject_value())?;

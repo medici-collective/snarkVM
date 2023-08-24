@@ -51,6 +51,7 @@ impl<N: Network> Package<N> {
         // Authorize the function call.
 
         println!("Authorizing the process...");
+        // todo (ab): we have inputs all the way back here so we technically could get message
         let authorization = process.authorize::<A, R>(private_key, program_id, function_name, inputs.iter(), rng)?;
 
         // Retrieve the program.

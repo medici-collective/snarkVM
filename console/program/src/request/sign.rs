@@ -88,6 +88,9 @@ impl<N: Network> Request<N> {
         message.extend([g_r, pk_sig, pr_sig, *caller].map(|point| point.to_x_coordinate()));
         message.extend([tvk, tcm, function_id]);
 
+        // todo (ab): can pull out the message here... but then will need to create a separate new path that takes in message...
+        println!("Message: {:?}", message);
+
         // Initialize a vector to store the prepared inputs.
         let mut prepared_inputs = Vec::with_capacity(inputs.len());
         // Initialize a vector to store the input IDs.
@@ -233,7 +236,7 @@ impl<N: Network> Request<N> {
         // TODO -- @matt -- make sure this maps correctly
         let challenge = N::hash_to_scalar_psd8(&message)?;
 
-        println!("{:?} after hash to scalar", message);
+        println!("{:?} after hash to scalar", challenge);
         // Compute `response` as `r - challenge * sk_sig`.
         // TODO -- @matt -- need to replace sk_sig here as well
         let response = r - challenge * sk_sig;

@@ -47,13 +47,12 @@ impl Execute {
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
 
-        // Execute the request.
         /*
          * todo (ab): we have inputs all the way back here... so we could just create a new cli method "generate message"
          * generate the message. and then create the full stack of functions with new fn sigs that take in a "message"
          */
 
-        // generate message
+        // Execute the request.
         let (response, execution, metrics) =
             package.execute::<Aleo, _>(self.endpoint, &private_key, self.function, &self.inputs, rng)?;
 

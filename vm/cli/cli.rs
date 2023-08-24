@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::cli::commands::{Build, Clean, Execute, New, Run, Update};
+use crate::cli::commands::{Build, Clean, Execute, Message, New, Run, Update};
 
 use anstyle::{AnsiColor, Color, Style};
 use anyhow::Result;
@@ -42,6 +42,8 @@ pub enum Command {
     Build(Build),
     #[clap(name = "clean")]
     Clean(Clean),
+    #[clap(name = "message")]
+    Message(Message),
     #[clap(name = "execute")]
     Execute(Execute),
     #[clap(name = "new")]
@@ -59,6 +61,7 @@ impl Command {
             Self::Build(command) => command.parse(),
             Self::Clean(command) => command.parse(),
             Self::Execute(command) => command.parse(),
+            Self::Message(command) => command.parse(),
             Self::New(command) => command.parse(),
             Self::Run(command) => command.parse(),
             Self::Update(command) => command.parse(),

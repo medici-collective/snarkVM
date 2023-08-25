@@ -17,12 +17,19 @@ use super::*;
 /// Generates a Message locally
 #[derive(Debug, Parser)]
 pub struct Message {
+    // todo (ab): will need to change struct here when we get right scheme
+    /// The function name.
+    function: Identifier<CurrentNetwork>,
+    /// The function inputs.
+    inputs: Vec<Value<CurrentNetwork>>,
+    /// Uses the specified endpoint.
     #[clap(default_value = "https://api.explorer.aleo.org/v1", long)]
     endpoint: String,
     /// Toggles offline mode.
     #[clap(long)]
     offline: bool,
 }
+
 
 impl Message {
     /// Compiles an Aleo program function with the specified name.
@@ -33,8 +40,15 @@ impl Message {
 
         // Load the package.
         let package: Package<CurrentNetwork> = Package::open(&path)?;
-        // Load the private key.
         // todo (ab): Looking for private key here, may have to remove...
+        // Load the private key.
+        let private_key = crate::cli::helpers::dotenv_private_key()?;
+
+        // Initialize an RNG.
+        let rng = &mut rand::thread_rng();
+
+        let resp = package.generate_message::<Aleo, _>(self.endpoint, &private_key, self.function, &self.inputs, rng)?;
+
         Ok(format!("hello world"))
     }
 }

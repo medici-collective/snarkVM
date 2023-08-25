@@ -13,10 +13,12 @@
 // limitations under the License.
 
 use super::*;
+use crate::prelude::Authorization;
 
 impl<N: Network> Package<N> {
     /// Executes a program function with the given inputs.
     #[allow(clippy::type_complexity)]
+    // todo (ab): will need to change struct here when we get right scheme
     pub fn generate_message<A: crate::circuit::Aleo<Network = N, BaseField = N::Field>, R: Rng + CryptoRng>(
         &self,
         endpoint: String,
@@ -24,8 +26,19 @@ impl<N: Network> Package<N> {
         function_name: Identifier<N>,
         inputs: &[Value<N>],
         rng: &mut R,
-    ) -> String {
-        Ok("Hello World");
+    ) -> Result<Authorization<N>> {
+        println!("Inside package");
+
+        let process = self.get_process()?;
+        // Retrieve the main program.
+        let program = self.program();
+        // Retrieve the program ID.
+        let program_id = program.id();
+
+        let authorization = process.authorize::<A, R>(private_key, program_id, function_name, inputs.iter(), rng)?;
+        // process.execute......
+
+        Ok(authorization)
     }
     // todo: frost_execute impl here
 }

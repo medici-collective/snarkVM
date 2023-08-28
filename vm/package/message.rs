@@ -13,12 +13,13 @@
 // limitations under the License.
 
 use super::*;
-use crate::prelude::Authorization;
+use crate::prelude::Field;
 
 impl<N: Network> Package<N> {
     /// Executes a program function with the given inputs.
     #[allow(clippy::type_complexity)]
     // todo (ab): will need to change struct here when we get right scheme
+    // todo (ab): rename these...
     pub fn generate_message<A: crate::circuit::Aleo<Network = N, BaseField = N::Field>, R: Rng + CryptoRng>(
         &self,
         endpoint: String,
@@ -26,7 +27,7 @@ impl<N: Network> Package<N> {
         function_name: Identifier<N>,
         inputs: &[Value<N>],
         rng: &mut R,
-    ) -> Result<Authorization<N>> {
+    ) -> Result<Vec<Field<N>>> {
         println!("Inside package");
 
         let process = self.get_process()?;
@@ -35,10 +36,14 @@ impl<N: Network> Package<N> {
         // Retrieve the program ID.
         let program_id = program.id();
 
-        let authorization = process.authorize::<A, R>(private_key, program_id, function_name, inputs.iter(), rng)?;
-        // process.execute......
+        // let authorization = process.authorize::<A, R>(private_key, program_id, function_name, inputs.iter(), rng)?;
 
-        Ok(authorization)
+        // todo: maybe I can call frost_sign here directly?
+        // let request = Request::sign(private_key, *self.program.id(), function_name, inputs, &input_types, rng)?;
+
+        // note: bypassing process.authorize here to limit nested call complexity
+        let message = process.get_stack(program_id)?.frost_authorize::<A, R>(private_key, function_name, inputs.iter(), rng);
+
+        Ok(message.unwrap())
     }
-    // todo: frost_execute impl here
 }

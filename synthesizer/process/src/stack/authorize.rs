@@ -65,17 +65,32 @@ impl<N: Network> Stack<N> {
         Ok(authorization)
     }
 
-    // pub fn frost_authorize<A: circuit::Aleo<Network = N>, R: Rng + CryptoRng>(
-    //     &self,
-    //     private_key: &PrivateKey<N>,
-    //     function_name: impl TryInto<Identifier<N>>,
-    //     inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
-    //     rng: &mut R, // todo (ab): may need to rethink return here
-    // ) -> Result<Authorization<N>> {
-    //     /*
-    //     * create new method return_input_message
-    //     * if we don't have a message, get the message and return
-    //     * if we do have a message, proceed as normal to Request::sign()
-    //     */
-    // }
+pub fn frost_authorize<A: circuit::Aleo<Network = N>, R: Rng + CryptoRng>(
+        &self,
+        private_key: &PrivateKey<N>,
+        function_name: impl TryInto<Identifier<N>>,
+        inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
+        rng: &mut R, // todo (ab): may need to rethink return here
+        // initial idea is to perhaps have message here. if we have it continue onwards, if not generate and return it.
+    ) -> Result<Vec<Field<N>>> {
+        /*
+        * create new method return_input_message
+        * if we don't have a message, get the message and return
+        * if we do have a message, proceed as normal to Request::sign()
+        */
+        let timer = timer!("Stack::authorize");
+        println!("Inside frost, authorizing the call");
+        // Prepare the function name.
+        let function_name = function_name.try_into().map_err(|_| anyhow!("Invalid function name"))?;
+        // Retrieve the input types.
+        let input_types = self.get_function(&function_name)?.input_types();
+        lap!(timer, "Retrieve the input types");
+
+        // Compute the request.
+        let message = Request::frost_sign(private_key, *self.program.id(), function_name, inputs, &input_types, rng)?;
+        lap!(timer, "Compute the request");
+
+        Ok(message)
+
+    }
 }

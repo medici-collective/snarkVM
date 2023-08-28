@@ -49,6 +49,6 @@ impl Message {
 
         let resp = package.generate_message::<Aleo, _>(self.endpoint, &private_key, self.function, &self.inputs, rng)?;
 
-        Ok(format!("hello world"))
+        Ok(format!("Completed"))
     }
 }

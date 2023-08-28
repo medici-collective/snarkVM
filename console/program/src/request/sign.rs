@@ -258,7 +258,7 @@ impl<N: Network> Request<N> {
         })
     }
     // todo (ab): Add generate_message function here.
-    pub fn generate_message<R: Rng + CryptoRng>(
+    pub fn frost_sign<R: Rng + CryptoRng>(
         private_key: &PrivateKey<N>,
         program_id: ProgramID<N>,
         function_name: Identifier<N>,
@@ -275,6 +275,11 @@ impl<N: Network> Request<N> {
                 inputs.len()
             )
         }
+
+        println!("We are frostinng.");
+
+        // Todo: Add if conditional, if we have message, then ...
+        // else: return message
 
         // Retrieve `sk_sig`
         let sk_sig = private_key.sk_sig();
@@ -457,6 +462,8 @@ impl<N: Network> Request<N> {
                 }
             }
         }
+
+        println!("Ladies and Gentleman, we got the message: {:?}", message);
 
         Ok(message)
 

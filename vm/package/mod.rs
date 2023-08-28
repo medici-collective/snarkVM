@@ -16,6 +16,7 @@ mod build;
 mod clean;
 mod deploy;
 mod execute;
+mod frost_execute;
 mod message;
 mod is_build_required;
 mod run;

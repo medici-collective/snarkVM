@@ -27,7 +27,7 @@ impl<N: Network> Package<N> {
         function_name: Identifier<N>,
         inputs: &[Value<N>],
         rng: &mut R,
-    ) -> Result<Vec<Field<N>>> {
+    ) -> Result<Vec<u8>> {
         println!("Inside package");
 
         let process = self.get_process()?;

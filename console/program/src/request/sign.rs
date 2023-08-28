@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm_console_account::private_key;
-
 use super::*;
 
 impl<N: Network> Request<N> {
@@ -265,7 +263,7 @@ impl<N: Network> Request<N> {
         inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
         input_types: &[ValueType<N>],
         rng: &mut R,
-    ) -> Result<Vec<Field<N>>> {
+    ) -> Result<Vec<u8>> {
         if input_types.len() != inputs.len() {
             bail!(
                 "Function '{}' in the program '{}' expects {} inputs, but {} were provided.",
@@ -463,9 +461,20 @@ impl<N: Network> Request<N> {
             }
         }
 
-        println!("Ladies and Gentleman, we got the message: {:?}", message);
+        // Serialize the message into bytes
+        let mut message_bytes = Vec::new();
 
-        Ok(message)
+        for field in message {
+            match field.to_bytes_le() {
+                Ok(bytes) => message_bytes.extend_from_slice(&bytes),
+                Err(e) => {
+                }
+            }
+        }
+
+        println!("Ladies and Gentleman, we got the message in bytes? : {:?}", message_bytes);
+
+        Ok(message_bytes)
 
     }
 }

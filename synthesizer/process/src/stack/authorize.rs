@@ -72,7 +72,7 @@ pub fn frost_authorize<A: circuit::Aleo<Network = N>, R: Rng + CryptoRng>(
         inputs: impl ExactSizeIterator<Item = impl TryInto<Value<N>>>,
         rng: &mut R, // todo (ab): may need to rethink return here
         // initial idea is to perhaps have message here. if we have it continue onwards, if not generate and return it.
-    ) -> Result<Vec<Field<N>>> {
+    ) -> Result<Vec<u8>> {
         /*
         * create new method return_input_message
         * if we don't have a message, get the message and return

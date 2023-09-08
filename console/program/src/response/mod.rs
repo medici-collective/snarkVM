@@ -154,6 +154,8 @@ impl<N: Network> Response<N> {
                         // Compute the encryption randomizer as `HashToScalar(tvk || index)`.
                         let randomizer = N::hash_to_scalar_psd2(&[*tvk, index])?;
 
+                        println!("Inside Program::Data::Record::encrypt...");
+
                         // Encrypt the record, using the randomizer.
                         let encrypted_record = record.encrypt(randomizer)?;
                         // Compute the record checksum, as the hash of the encrypted record.

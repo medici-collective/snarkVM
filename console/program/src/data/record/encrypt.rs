@@ -18,9 +18,11 @@ impl<N: Network> Record<N, Plaintext<N>> {
     /// Encrypts `self` for the record owner under the given randomizer.
     pub fn encrypt(&self, randomizer: Scalar<N>) -> Result<Record<N, Ciphertext<N>>> {
         // Ensure the randomizer corresponds to the record nonce.
+        println!("We running inside Program::Data::Record::encrypt...");
         if self.nonce == N::g_scalar_multiply(&randomizer) {
             // Compute the record view key.
             let record_view_key = (**self.owner * randomizer).to_x_coordinate();
+            println!("printing record view key: {:?} ",record_view_key);
             // Encrypt the record.
             self.encrypt_symmetric_unchecked(&record_view_key)
         } else {

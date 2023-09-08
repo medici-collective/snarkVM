@@ -285,7 +285,7 @@ impl<N: Network> Process<N> {
 
     /// Synthesizes the proving and verifying key for the given program ID and function name.
     #[inline]
-    pub fn synthesize_key<A: circuit::Aleo<Network = N>, R: Rng + CryptoRng>(
+    pub fn synthesize_key<A: circuit::Aleo<Network = N>, R: Rng + CryptoRng + std::fmt::Debug>(
         &self,
         program_id: &ProgramID<N>,
         function_name: &Identifier<N>,

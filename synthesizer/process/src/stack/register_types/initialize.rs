@@ -70,6 +70,7 @@ impl<N: Network> RegisterTypes<N> {
             //  the caller to provide optional constant inputs (instead of sampling random constants).
             //  Then, this check can be removed to enable support for constant inputs in functions.
             ensure!(!matches!(input.value_type(), ValueType::Constant(..)), "Constant inputs are not supported");
+            println!("{:?} is input from function.inputs inside of stack::register_types::initialize.rs", input);
 
             // Check the input register type.
             register_types.check_input(stack, input.register(), &RegisterType::from(*input.value_type()))?;

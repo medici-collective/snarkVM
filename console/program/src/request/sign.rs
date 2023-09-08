@@ -41,52 +41,96 @@ impl<N: Network> Request<N> {
         }
 
         println!("Inside Request::sign...");
+        println!("Starting off Request::sign... -- these are the vars");
+        println!("{:?} private key passed in to Request::sign.....", private_key);
+        println!("{:?} program_id passed in to Request::sign.....", program_id);
+        println!("{:?} function_name passed in to Request::sign.....", function_name);
+        // println!("{:?} inputs passed in to Request::sign.....", inputs);
+        println!("{:?} input_types passed in to Request::sign.....", input_types);
+        // println!("{:?} rng passed in to Request::sign.....", rng);
 
         // Retrieve `sk_sig`.
         // TODO @matt -- swap with seed phrase for a view key
+        println!("{:?} private key passed in to Request::sign.....", private_key);
         let sk_sig = private_key.sk_sig();
+        println!("{:?} sk_sig taken out of private key in Request::sign.....", sk_sig);
 
         // Derive the compute key.
         let compute_key = ComputeKey::try_from(private_key)?;
+        println!("compute_key created from private key in Request::sign {:?} ....", compute_key);
 
         // TODO @matt -- test derive a compute key from a seed phrase for view key
         // let compute_key_two = ComputeKey::try_from();
 
         // Retrieve `pk_sig`.
         let pk_sig = compute_key.pk_sig();
+        println!("pk_sig created from compute key in Request::sign {:?} ....", pk_sig);
         // Retrieve `pr_sig`.
         let pr_sig = compute_key.pr_sig();
+        println!("pr_sig created from compute key in Request::sign {:?} ....", pr_sig);
 
         // Derive the view key.
         let view_key = ViewKey::try_from((private_key, &compute_key))?;
+        println!("view_key created from private key & compute_key in Request::sign {:?} ....", view_key);
+
+        
         // Derive `sk_tag` from the graph key.
         let sk_tag = GraphKey::try_from(view_key)?.sk_tag();
+        println!("GraphKey created from view_key in Request::sign {:?} ....", GraphKey::try_from(view_key));
+        println!("sk_tag created from graph_key in Request::sign {:?} ....", sk_tag);
 
         // Sample a random nonce.
         let nonce = Field::<N>::rand(rng);
         // Compute a `r` as `HashToScalar(sk_sig || nonce)`. Note: This is the transition secret key `tsk`.
         // TODO @matt -- use seed phrase from MS view key
+        println!("sk_sig.to_field that's used in r creation in Request::sign {:?} ....", sk_sig.to_field());
         let r = N::hash_to_scalar_psd4(&[N::serial_number_domain(), sk_sig.to_field()?, nonce])?;
+        println!("r creation in Request::sign {:?} .... this is transition secret key tsk", r);
+        
         // Compute `g_r` as `r * G`. Note: This is the transition public key `tpk`.
         let g_r = N::g_scalar_multiply(&r);
+        println!("g_r creation in Request::sign {:?} .... this is transition public key tpk", g_r);
 
         // Derive the caller from the compute key.
         // TODO -- make sure  Address here is computed from view key instead of compute key but it also needs to match owner of record
+        // let caller = Address::try_from(compute_key)?;
+        // let man_view_key = ViewKey::from_str("AViewKey1envSengfZEn4HskdFf38nhbHWnfTnwghPKN8MqZro7km")?;
+        // println!("manually input view key that's used as the address to auth in Request::sign {:?} ....", man_view_key);
+        // let caller = Address::try_from(man_view_key)?;
+        
         let caller = Address::try_from(compute_key)?;
+        println!("caller that's used as the address to auth in Request::sign {:?} ....", caller);
+        let old_caller = Address::try_from(compute_key)?;
+        println!("old caller from previous code that's used as the address to auth in Request::sign {:?} ....", old_caller);
         // Compute the transition view key `tvk` as `r * caller`.
         let tvk = (*caller * r).to_x_coordinate();
+        println!("tvk that's used as the view_key for the txn and is created by (*caller * r).to_x_coordinate() in Request::sign {:?} ....", tvk);
+        println!("tvk that is just (*caller * r) in Request::sign {:?} that's not using ....", (*caller * r));
         // Compute the transition commitment `tcm` as `Hash(tvk)`.
         let tcm = N::hash_psd2(&[tvk])?;
+        println!("tcm that is just a hash_psd2 in Request::sign {:?} that's not using ....", tcm);
 
         // Compute the function ID as `Hash(network_id, program_id, function_name)`.
+        println!("Let's figure out what the actual flip this function ID looks like -- it takes in program_id and bunch of things from it");
+        println!("program_id.name in Request::sign is {:?} ....", program_id.name());
+        println!("program_id.network in Request::sign is {:?} ....", program_id.network());
+        println!("function_name in Request::sign is {:?} ....", function_name);
+        println!("figuring out wtf to_bits_le does in Request::sign is {:?} ....", (U16::<N>::new(N::ID), program_id.name(), program_id.network(), function_name).to_bits_le());
+
         let function_id = N::hash_bhp1024(
             &(U16::<N>::new(N::ID), program_id.name(), program_id.network(), function_name).to_bits_le(),
         )?;
+        println!("function_id that is just a hash_psd1024 of program_id.name, program_id.network, function name and throwing to bits in Request::sign {:?} ....", function_id);
 
         // Construct the hash input as `(r * G, pk_sig, pr_sig, caller, [tvk, tcm, function ID, input IDs])`.
         let mut message = Vec::with_capacity(5 + 2 * inputs.len());
+        println!("Message before adding g_r, pk_sig, pr_sig, *caller: {:?}", message);
+        // println!("Message after adding we didn't throw it to to_x_coordinate {:?}", message.extend([g_r, pk_sig, pr_sig, *caller].map(|point| point)));
         message.extend([g_r, pk_sig, pr_sig, *caller].map(|point| point.to_x_coordinate()));
+        println!("Message after adding g_r, pk_sig, pr_sig, *caller: {:?} with x coord", message);
         message.extend([tvk, tcm, function_id]);
+        println!("Message after adding tvk, tcm, function_id {:?}", message);
+
 
         // todo (ab): can pull out the message here... but then will need to create a separate new path that takes in message...
         println!("Message: {:?}", message);

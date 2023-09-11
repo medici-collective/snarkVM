@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
 use super::*;
 
 impl<N: Network> Request<N> {
@@ -228,9 +229,7 @@ impl<N: Network> Request<N> {
                 }
             }
         }
-
         println!("{:?} before hash to scalar.....", message);
-        println!("--------------------------------");
 
         // Compute `challenge` as `HashToScalar(r * G, pk_sig, pr_sig, caller, [tvk, tcm, function ID, input IDs])`.
         // TODO -- @matt -- make sure this maps correctly
@@ -255,7 +254,6 @@ impl<N: Network> Request<N> {
             tcm,
         })
     }
-    // todo (ab): Add generate_message function here.
     pub fn frost_sign<R: Rng + CryptoRng>(
         private_key: &PrivateKey<N>,
         program_id: ProgramID<N>,
@@ -323,7 +321,52 @@ impl<N: Network> Request<N> {
         // Construct the hash input as `(r * G, pk_sig, pr_sig, caller, [tvk, tcm, function ID, input IDs])`
         let mut message = Vec::with_capacity(5 + 2 * inputs.len());
         message.extend([g_r, pk_sig, pr_sig, *caller].map(|point|point.to_x_coordinate()));
+
+        let mut my_dict: HashMap<String, Value<N>> = HashMap::new();
+
+        for (index, field) in message.clone().into_iter().enumerate() {
+            let lit = Literal::Field(field);
+            let val = Value::from(&lit); // assuming the conversion takes a reference
+            let key = format!("field_{}", index + 1);  // generate key in the format "field_i"
+            my_dict.insert(key, val);
+        }
+
+
+        let string_representation: String = my_dict.iter()
+        .map(|(k, v)| (k, k.trim_start_matches("field_").parse::<usize>().unwrap_or(0), v)) // extract numeric part
+        .sorted_by(|(_, a_num, _), (_, b_num, _)| a_num.cmp(b_num)) // sort by the numeric part
+        .map(|(key, _, value)| format!("  {}: {:?}", key, value)) // Use Debug trait for formatting
+        .collect::<Vec<String>>()
+        .join(",\n");
+
+        // println!("{:?}", string_representation);
+
+        // println!("__________________________________________");
+
+
+        let result = format!("{{\n{}\n}}", string_representation);
+        println!("RESULT: {}", result);
+
+        // string to Result<Value<N>>;
+        // let lit_two = Literal::String(&result);
+        let val_of_dict: Result<Value<N>> = Value::try_from(&result);
+
+        println!("__________________________________________");
+
+        println!("VAL OF DICT: {:?}", val_of_dict);
+        println!("__________________________________________");
+        let val_unwrapped = val_of_dict.unwrap();
+        println!("Val unwrapped: {:?}", val_unwrapped);
+
+        let res = val_unwrapped.to_fields()?;
+        println!("RES BABY: {:?}", res);
+        println!("__________________________________________");
+
+
+        // just extend message later...
         message.extend([tvk, tcm, function_id]);
+
+        // todo: yeet out tvk, tcm, function_id
 
         // Initialize a vector to store the prepared inputs.
         let mut prepared_inputs = Vec::with_capacity(inputs.len());
@@ -457,9 +500,25 @@ impl<N: Network> Request<N> {
                     message.push(input_hash);
                     // Add the input hash to the inputs.
                     input_ids.push(InputID::ExternalRecord(input_hash));
+                    println!("PREIMAGE: {:?}", preimage);
+                    println!("__________________________________________");
                 }
             }
         }
+
+        println!("__________________________________________");
+        // todo: call hash_to_scalar on above res
+        let challenge = N::hash_to_scalar_psd8(&res)?;
+
+        println!("CHALLENGE {:?} after hash to scalar", challenge);
+        println!("__________________________________________");
+
+        // Compute `response` as `r - challenge * sk_sig`.
+        // TODO -- @matt -- need to replace sk_sig here as well
+        let response = r - challenge * sk_sig;
+
+        let sig: snarkvm_console_account::Signature<N> = Signature::from((challenge, response, compute_key));
+        println!("SIGNATURE: {:?}", sig);
 
         // Serialize the message into bytes
         let mut message_bytes = Vec::new();
@@ -472,6 +531,7 @@ impl<N: Network> Request<N> {
             }
         }
 
+        println!("__________________________________");
         println!("Ladies and Gentleman, we got the message in bytes? : {:?}", message_bytes);
 
         Ok(message_bytes)

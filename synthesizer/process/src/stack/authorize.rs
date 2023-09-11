@@ -51,6 +51,8 @@ impl<N: Network> Stack<N> {
         // Initialize the authorization.
         let authorization = Authorization::from(request.clone());
 
+        println!("Authorized!");
+
         // This logic is only executed if the program contains external calls.
         if self.get_number_of_calls(&function_name)? > 1 {
             // Construct the call stack.

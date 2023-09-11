@@ -83,14 +83,28 @@ impl<N: Network> SignVerify<N> {
             Literal::Signature(signature) => signature,
             _ => bail!("Expected the first operand to be a signature."),
         };
+
+        println!("SIGNATURE: {:?}", signature);
+        println!("__________________________________");
+
         let address = match registers.load_literal(stack, &self.operands[1])? {
             Literal::Address(address) => address,
             _ => bail!("Expected the second operand to be an address."),
         };
+
         let message = registers.load(stack, &self.operands[2])?;
 
+        println!("MESSAGE INSIDE SIGN_VERIFY: {:?}", message);
+        println!("__________________________________");
+
         // Verify the signature.
+
+        println!("VERIFYING THE SIGNATURE....");
+        println!("__________________________________");
         let output = Literal::Boolean(Boolean::new(signature.verify(&address, &message.to_fields()?)));
+
+        println!("OUTPUT OF SIG VERIFICATION {:?}", output);
+        println!("__________________________________");
 
         // Store the output.
         registers.store_literal(stack, &self.destination, output)

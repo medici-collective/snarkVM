@@ -304,8 +304,28 @@ impl<N: Network> Request<N> {
         // Compute `g_r` as `r * G`. Note: this is the transition public key `tpk`.
         let g_r = N::g_scalar_multiply(&r);
 
+        println!("G_R INSIDE REQUEST::SIGN : {:?}", g_r);
+        println!("------------------------");
+
+        println!("PK SIG INSIDE Request::Sign: {:?}", pk_sig);
+        println!("__________________________________");
+
+        println!("PR SIG INSIDE Request::Sign: {:?}", pr_sig);
+        println!("__________________________________");
+
+        println!("__________________________________");
+
+        println!("COMPUTE KEY INSIDE Request::Sign: {:?}", compute_key);
+        println!("__________________________________");
+
+
+
+
         // Derive the caller from the compute key
         let caller = Address::try_from(compute_key)?;
+
+        println!("Address INSIDE Request::Sign: {:?}", caller);
+        println!("__________________________________");
 
         // Compute the transition view key `tvk` as `r * caller`.
         let tvk = (*caller * r).to_x_coordinate();
@@ -320,7 +340,20 @@ impl<N: Network> Request<N> {
 
         // Construct the hash input as `(r * G, pk_sig, pr_sig, caller, [tvk, tcm, function ID, input IDs])`
         let mut message = Vec::with_capacity(5 + 2 * inputs.len());
+        println!("MESSAGE AFTER VEC INITIALIZATION {:?}", message);
+        println!("__________________________________");
         message.extend([g_r, pk_sig, pr_sig, *caller].map(|point|point.to_x_coordinate()));
+
+        println!("MESSAGE AFTER EXTEND {:?}", message);
+        println!("__________________________________");
+
+        println!("MESSAGE HASHED {:?}", N::hash_to_scalar_psd8(&message));
+        println!("__________________________________");
+
+        println!("MESSAGE INSIDE Request::Sign: {:?}", message);
+        println!("__________________________________");
+
+
 
         let mut my_dict: HashMap<String, Value<N>> = HashMap::new();
 
@@ -358,13 +391,14 @@ impl<N: Network> Request<N> {
         let val_unwrapped = val_of_dict.unwrap();
         println!("Val unwrapped: {:?}", val_unwrapped);
 
-        let res = val_unwrapped.to_fields()?;
+        let mut res = val_unwrapped.to_fields()?;
         println!("RES BABY: {:?}", res);
         println!("__________________________________________");
 
-
-        // just extend message later...
         message.extend([tvk, tcm, function_id]);
+        println!("__________________________________________");
+        println!("MESSAGE AFTER TVK, TCM EXTENSION {:?}", message);
+        println!("__________________________________________");
 
         // todo: yeet out tvk, tcm, function_id
 
@@ -444,6 +478,12 @@ impl<N: Network> Request<N> {
 
                     // Add the input hash to the preimage.
                     message.push(input_hash);
+                    println!("__________________________________________");
+                    println!("PREIMAGE INSIDE FOR LOOP: {:?}", message);
+                    println!("__________________________________________");
+
+                    let scaled = N::hash_to_scalar_psd8(&message);
+                    println!("SCALARED {:?}", scaled);
                     // Add the input hash to the inputs.
                     input_ids.push(InputID::Private(input_hash));
                 }
@@ -500,11 +540,17 @@ impl<N: Network> Request<N> {
                     message.push(input_hash);
                     // Add the input hash to the inputs.
                     input_ids.push(InputID::ExternalRecord(input_hash));
-                    println!("PREIMAGE: {:?}", preimage);
-                    println!("__________________________________________");
                 }
             }
         }
+
+        let first_four_message = message[0..4].to_vec();
+        println!("FIRST_FOUR MES, {:?}", first_four_message);
+        println!("__________________________________________");
+        &res.splice(0..0, first_four_message);
+        println!("RES AFTER PREPEND {:?}", res);
+        println!("__________________________________________");
+
 
         println!("__________________________________________");
         // todo: call hash_to_scalar on above res
@@ -517,7 +563,14 @@ impl<N: Network> Request<N> {
         // TODO -- @matt -- need to replace sk_sig here as well
         let response = r - challenge * sk_sig;
 
+        println!("------------------------");
+
+        println!("RESPONSE: {:?}", response);
+
         let sig: snarkvm_console_account::Signature<N> = Signature::from((challenge, response, compute_key));
+
+        println!("------------------------");
+
         println!("SIGNATURE: {:?}", sig);
 
         // Serialize the message into bytes
@@ -533,6 +586,7 @@ impl<N: Network> Request<N> {
 
         println!("__________________________________");
         println!("Ladies and Gentleman, we got the message in bytes? : {:?}", message_bytes);
+        println!("------------------------");
 
         Ok(message_bytes)
 

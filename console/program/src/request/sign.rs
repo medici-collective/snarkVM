@@ -330,13 +330,23 @@ impl<N: Network> Request<N> {
         // Compute the transition view key `tvk` as `r * caller`.
         let tvk = (*caller * r).to_x_coordinate();
 
+        println!("TVK: {:?}", tvk);
+        println!("__________________________________");
+
         // Compute the transition commitment `tcm` as `Hash(tvk)`.
         let tcm = N::hash_psd2(&[tvk])?;
+
+        println!("TCM: {:?}", tcm);
+        println!("__________________________________");
 
         // Compute the function ID as `Hash(network_id, program_id, function_name)`.
         let function_id = N::hash_bhp1024(
             &(U16::<N>::new(N::ID), program_id.name(), program_id.network(), function_name).to_bits_le(),
         )?;
+
+
+        println!("FUNCTION ID: {:?}", function_id);
+        println!("__________________________________");
 
         // Construct the hash input as `(r * G, pk_sig, pr_sig, caller, [tvk, tcm, function ID, input IDs])`
         let mut message = Vec::with_capacity(5 + 2 * inputs.len());

@@ -350,20 +350,12 @@ impl<N: Network> Request<N> {
 
         // Construct the hash input as `(r * G, pk_sig, pr_sig, caller, [tvk, tcm, function ID, input IDs])`
         let mut message = Vec::with_capacity(5 + 2 * inputs.len());
-        println!("MESSAGE AFTER VEC INITIALIZATION {:?}", message);
+        println!("MESSAGE AFTER VEC INITIALIZATION INSIDE REQUEST::SIGN {:?}", message);
         println!("__________________________________");
         message.extend([g_r, pk_sig, pr_sig, *caller].map(|point|point.to_x_coordinate()));
 
-        println!("MESSAGE AFTER EXTEND {:?}", message);
+        println!("MESSAGE AFTER EXTEND INSIDE REQUEST::SIGN {:?}", message);
         println!("__________________________________");
-
-        println!("MESSAGE HASHED {:?}", N::hash_to_scalar_psd8(&message));
-        println!("__________________________________");
-
-        println!("MESSAGE INSIDE Request::Sign: {:?}", message);
-        println!("__________________________________");
-
-
 
         let mut my_dict: HashMap<String, Value<N>> = HashMap::new();
 
@@ -404,6 +396,11 @@ impl<N: Network> Request<N> {
         let mut res = val_unwrapped.to_fields()?;
         println!("RES BABY: {:?}", res);
         println!("__________________________________________");
+
+        let first_four_message = message[0..4].to_vec();
+        println!("FIRST_FOUR MES, {:?}", first_four_message);
+        println!("__________________________________________");
+        &res.splice(0..0, first_four_message);
 
         message.extend([tvk, tcm, function_id]);
         println!("__________________________________________");
@@ -488,12 +485,12 @@ impl<N: Network> Request<N> {
 
                     // Add the input hash to the preimage.
                     message.push(input_hash);
-                    println!("__________________________________________");
-                    println!("PREIMAGE INSIDE FOR LOOP: {:?}", message);
-                    println!("__________________________________________");
+                    // println!("__________________________________________");
+                    // println!("PREIMAGE INSIDE FOR LOOP: {:?}", message);
+                    // println!("__________________________________________");
 
                     let scaled = N::hash_to_scalar_psd8(&message);
-                    println!("SCALARED {:?}", scaled);
+                    // println!("SCALARED {:?}", scaled);
                     // Add the input hash to the inputs.
                     input_ids.push(InputID::Private(input_hash));
                 }
@@ -554,10 +551,6 @@ impl<N: Network> Request<N> {
             }
         }
 
-        let first_four_message = message[0..4].to_vec();
-        println!("FIRST_FOUR MES, {:?}", first_four_message);
-        println!("__________________________________________");
-        &res.splice(0..0, first_four_message);
         println!("RES AFTER PREPEND {:?}", res);
         println!("__________________________________________");
 

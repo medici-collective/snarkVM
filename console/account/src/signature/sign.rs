@@ -44,31 +44,40 @@ impl<N: Network> Signature<N> {
         // Construct the hash input as (r * G, pk_sig, pr_sig, address, message).
         let mut preimage = Vec::with_capacity(4 + message.len());
         preimage.extend([g_r, pk_sig, pr_sig, *address].map(|point| point.to_x_coordinate()));
-        preimage.extend(message);
+
+        // Insert dictionary and hash map logic here
+        let mut my_dict: HashMap<String, Value<N>> = HashMap::new();
+
+        for (index, field) in preimage.clone().into_iter().enumerate() {
+            let lit = Literal::Field(field);
+            let val = Value::from(&lit); // assuming the conversion takes a reference
+            let key = format!("field_{}", index + 1);  // generate key in the format "field_i"
+            my_dict.insert(key, val);
+        }
+
+
+        let string_representation: String = my_dict.iter()
+        .map(|(k, v)| (k, k.trim_start_matches("field_").parse::<usize>().unwrap_or(0), v)) // extract numeric part
+        .sorted_by(|(_, a_num, _), (_, b_num, _)| a_num.cmp(b_num)) // sort by the numeric part
+        .map(|(key, _, value)| format!("  {}: {:?}", key, value)) // Use Debug trait for formatting
+        .collect::<Vec<String>>()
+        .join(",\n");
+
+        let result = format!("{{\n{}\n}}", string_representation);
+        let val_of_dict: Result<Value<N>> = Value::try_from(&result);
+        let val_unwrapped = val_of_dict.unwrap();
+        let mut res = val_unwrapped.to_fields()?;
+        let first_four_message = preimage[0..4].to_vec();
+        &res.splice(0..0, first_four_message);
+
+        // TODO: @matt & @abhin -- looks like we never use the message -- need to fix
+        // preimage.extend(message);
+
 
         println!("PREIMAGE BEFORE HASH TO SCALAR: {:?}", preimage);
 
-        // println!("-------------------------");
-
-        // let mut my_dict: HashMap<String, Value<N>> = HashMap::new();
-
-        // for (index, field) in message.clone().into_iter().enumerate() {
-        //     let lit = Literal::Field(field);
-        //     let val = Value::from(&lit); // assuming the conversion takes a reference
-        //     let key = format!("field_{}", index + 1);  // generate key in the format "field_i"
-        //     my_dict.insert(key, val);
-        // }
-
-
-        // let string_representation: String = my_dict.iter()
-        // .map(|(k, v)| (k, k.trim_start_matches("field_").parse::<usize>().unwrap_or(0), v)) // extract numeric part
-        // .sorted_by(|(_, a_num, _), (_, b_num, _)| a_num.cmp(b_num)) // sort by the numeric part
-        // .map(|(key, _, value)| format!("  {}: {:?}", key, value)) // Use Debug trait for formatting
-        // .collect::<Vec<String>>()
-        // .join(",\n");
-
         // Compute the verifier challenge.
-        let challenge = N::hash_to_scalar_psd8(&preimage)?;
+        let challenge = N::hash_to_scalar_psd8(&res)?;
 
         println!("CHALLENGE: {:?}", challenge);
         // Compute the prover response.

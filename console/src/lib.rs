@@ -28,9 +28,6 @@ pub use snarkvm_console_collections as collections;
 #[cfg(feature = "network")]
 pub use snarkvm_console_network as network;
 
-#[cfg(feature = "program")]
-pub use snarkvm_console_program as program;
-
 #[cfg(feature = "types")]
 pub use snarkvm_console_types as types;
 

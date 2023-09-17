@@ -46,11 +46,11 @@ impl<N: Network> Signature<N> {
         preimage.extend([g_r, pk_sig, pr_sig, *address].map(|point| point.to_x_coordinate()));
 
         // Insert dictionary and hash map logic here
-        let mut my_dict: HashMap<String, Value<N>> = HashMap::new();
+        let mut my_dict: HashMap<String, Field<N>> = HashMap::new();
 
         for (index, field) in preimage.clone().into_iter().enumerate() {
-            let lit = Literal::Field(field);
-            let val = Value::from(&lit); // assuming the conversion takes a reference
+            // let lit = Literal::Field(field);
+            let val = field; // assuming the conversion takes a reference
             let key = format!("field_{}", index + 1);  // generate key in the format "field_i"
             my_dict.insert(key, val);
         }
@@ -64,17 +64,38 @@ impl<N: Network> Signature<N> {
         .join(",\n");
 
         let result = format!("{{\n{}\n}}", string_representation);
-        let val_of_dict: Result<Value<N>> = Value::try_from(&result);
-        let val_unwrapped = val_of_dict.unwrap();
-        let mut res = val_unwrapped.to_fields()?;
+        // Result is a string and the Leo opcode for verify takes the message and turns it to field
+        // It does this by figuring out the value is a plaintext
+        // It then uses plaintext.to_field() which does the following
+        /// let mut bits_le = self.to_bits_le();
+        /// Adds one final bit to the data, to serve as a terminus indicator.
+        /// During decryption, this final bit ensures we've reached the end.
+        /// bits_le.push(true);
+        /// 
+        /// let fields = bits_le
+        /// .chunks(Field::<N>::size_in_data_bits())
+        /// .map(Field::<N>::from_bits_le)
+        /// .collect::<Result<Vec<_>>>()?;
+        /// Then it has some logic to ensure the field elements don't exceed max size
+        
+        // need to convert string to bits
+        let val_of_dict: Vec<bool> = String::to_bits_le(&result);
+        // let val_unwrapped = val_of_dict.unwrap(); <-- don't need this anymore bc tryfrom is result; this isn't
+        // need to convert bits to vec of fields
+        // borrowed logic to chunk vec of bits_le to vec of field from above
+        let fields = val_of_dict
+         .chunks(Field::<N>::size_in_data_bits())
+         .map(Field::<N>::from_bits_le)
+         .collect::<Result<Vec<_>>>()?;
+        
+        // Keeping as res so don't have to change as much before
+        let mut res: Vec<Field<N>>  = fields;
         let first_four_message = preimage[0..4].to_vec();
         &res.splice(0..0, first_four_message);
 
         // TODO: @matt & @abhin -- looks like we never use the message -- need to fix
         // preimage.extend(message);
-
-
-        println!("PREIMAGE BEFORE HASH TO SCALAR: {:?}", preimage);
+        // println!("PREIMAGE BEFORE HASH TO SCALAR: {:?}", preimage);
 
         // Compute the verifier challenge.
         let challenge = N::hash_to_scalar_psd8(&res)?;

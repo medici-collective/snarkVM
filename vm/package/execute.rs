@@ -46,9 +46,15 @@ impl<N: Network> Package<N> {
         println!("🚀 Executing '{}'...\n", locator.to_string().bold());
 
         // Construct the process.
+        println!("Getting process...");
         let process = self.get_process()?;
         // Authorize the function call.
+
+        println!("Authorizing the process...");
+        // todo (ab): we have inputs all the way back here so we technically could get message
         let authorization = process.authorize::<A, R>(private_key, program_id, function_name, inputs.iter(), rng)?;
+
+        println!("retrieving the program");
 
         // Retrieve the program.
         let program = process.get_program(program_id)?;
@@ -86,8 +92,10 @@ impl<N: Network> Package<N> {
         // Prepare the build directory.
         let build_directory = self.build_directory();
         // Load the prover.
+        println!("loading the prover");
         let prover = ProverFile::open(&build_directory, &function_name)?;
         // Load the verifier.
+        println!("loading the verifier");
         let verifier = VerifierFile::open(&build_directory, &function_name)?;
 
         // Adds the proving key to the process.
@@ -96,18 +104,23 @@ impl<N: Network> Package<N> {
         process.insert_verifying_key(program_id, &function_name, verifier.verifying_key().clone())?;
 
         // Execute the circuit.
+        println!("executing the circuit");
         let (response, mut trace) = process.execute::<A>(authorization)?;
 
         // Retrieve the call metrics.
         let call_metrics = trace.call_metrics().to_vec();
 
         // Prepare the trace.
+        println!("preparing the trace");
         trace.prepare(Query::<_, BlockMemory<_>>::from(endpoint))?;
         // Prove the execution.
+        println!("proving the execution");
         let execution = trace.prove_execution::<A, R>(&locator.to_string(), rng)?;
         // Return the response, execution, and call metrics.
         Ok((response, execution, call_metrics))
     }
+
+    // todo: frost_execute impl here
 }
 
 #[cfg(test)]

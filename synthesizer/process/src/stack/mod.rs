@@ -179,6 +179,7 @@ impl<N: Network> Stack<N> {
     #[inline]
     pub fn new(process: &Process<N>, program: &Program<N>) -> Result<Self> {
         // Retrieve the program ID.
+        println!("Inside creating new stack...");
         let program_id = program.id();
         // Ensure the program does not already exist in the process.
         ensure!(!process.contains_program(program_id), "Program '{program_id}' already exists");
@@ -242,9 +243,9 @@ impl<N: Network> StackProgram<N> for Stack<N> {
         }
     }
 
-    /// Returns `true` if the stack contains the external record.
+    /// Returns the external record if the stack contains the external record.
     #[inline]
-    fn get_external_record(&self, locator: &Locator<N>) -> Result<RecordType<N>> {
+    fn get_external_record(&self, locator: &Locator<N>) -> Result<&RecordType<N>> {
         // Retrieve the external program.
         let external_program = self.get_external_program(locator.program_id())?;
         // Return the external record, if it exists.

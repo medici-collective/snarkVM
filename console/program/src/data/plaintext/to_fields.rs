@@ -19,8 +19,12 @@ impl<N: Network> ToFields for Plaintext<N> {
 
     /// Returns this plaintext as a list of field elements.
     fn to_fields(&self) -> Result<Vec<Self::Field>> {
+        println!("--------------------");
+        println!("PLAINTEXT SELF: {:?}", self);
         // Encode the data as little-endian bits.
         let mut bits_le = self.to_bits_le();
+        println!("--------------------");
+        println!("PLAINTEXT BITS_LE: {:?}", bits_le);
         // Adds one final bit to the data, to serve as a terminus indicator.
         // During decryption, this final bit ensures we've reached the end.
         bits_le.push(true);
@@ -29,6 +33,9 @@ impl<N: Network> ToFields for Plaintext<N> {
             .chunks(Field::<N>::size_in_data_bits())
             .map(Field::<N>::from_bits_le)
             .collect::<Result<Vec<_>>>()?;
+        println!("--------------------");
+        println!("PLAINTEXT FIELDS BITS_LE: {:?}", fields);
+        println!("--------------------");
         // Ensure the number of field elements does not exceed the maximum allowed size.
         match fields.len() <= N::MAX_DATA_SIZE_IN_FIELDS as usize {
             true => Ok(fields),

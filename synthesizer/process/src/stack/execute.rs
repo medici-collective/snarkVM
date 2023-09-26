@@ -81,7 +81,7 @@ impl<N: Network> StackExecute<N> for Stack<N> {
         ensure!(A::num_public() == num_public, "Illegal closure operation: instructions injected public variables");
 
         use circuit::Inject;
-
+        println!("loading the outputs");
         // Load the outputs.
         let outputs = closure
             .outputs()
@@ -126,6 +126,7 @@ impl<N: Network> StackExecute<N> for Stack<N> {
     #[inline]
     fn execute_function<A: circuit::Aleo<Network = N>>(&self, mut call_stack: CallStack<N>) -> Result<Response<N>> {
         let timer = timer!("Stack::execute_function");
+        println!("Inside execute function...");
 
         // Ensure the call stack is not `Evaluate`.
         ensure!(!matches!(call_stack, CallStack::Evaluate(..)), "Illegal operation: cannot evaluate in execute mode");
@@ -134,6 +135,7 @@ impl<N: Network> StackExecute<N> for Stack<N> {
         A::reset();
 
         // Retrieve the next request.
+        println!("Popping off the call stack...");
         let console_request = call_stack.pop()?;
 
         // Ensure the network ID matches.
@@ -179,6 +181,7 @@ impl<N: Network> StackExecute<N> for Stack<N> {
         // Inject the request as `Mode::Private`.
         let request = circuit::Request::new(circuit::Mode::Private, console_request.clone());
         // Ensure the request has a valid signature, inputs, and transition view key.
+        println!("verifying request signature, inputs, and tvk");
         A::assert(request.verify(&input_types, &tpk));
         lap!(timer, "Verify the circuit request");
 
@@ -206,6 +209,7 @@ impl<N: Network> StackExecute<N> for Stack<N> {
         // Store the inputs.
         function.inputs().iter().map(|i| i.register()).zip_eq(request.inputs()).try_for_each(|(register, input)| {
             // If the circuit is in execute mode, then store the console input.
+            println!("Input: {:?}", input.eject_value());
             if let CallStack::Execute(..) = registers.call_stack() {
                 // Assign the console input to the register.
                 registers.store(self, register, input.eject_value())?;
@@ -220,9 +224,12 @@ impl<N: Network> StackExecute<N> for Stack<N> {
 
         // Execute the instructions.
         for instruction in function.instructions() {
+            println!("inside function.instructions() for loop");
+            println!("All instructions: {:?}", function.instructions());
             // If the circuit is in execute mode, then evaluate the instructions.
             if let CallStack::Execute(..) = registers.call_stack() {
                 // Evaluate the instruction.
+                println!("evaluating instructions");
                 let result = match instruction {
                     // If the instruction is a `call` instruction, we need to handle it separately.
                     Instruction::Call(call) => CallTrait::evaluate(call, self, &mut registers),
@@ -236,12 +243,15 @@ impl<N: Network> StackExecute<N> for Stack<N> {
             }
 
             // Execute the instruction.
+            println!("executing instructions");
+            println!("Executing the following INSTRUCTION: {:?}", instruction);
             let result = match instruction {
                 // If the instruction is a `call` instruction, we need to handle it separately.
                 Instruction::Call(call) => CallTrait::execute(call, self, &mut registers),
                 // Otherwise, execute the instruction normally.
                 _ => instruction.execute(self, &mut registers),
             };
+            println!("RESULT: {:?}", result);
             // If the execution fails, bail and return the error.
             if let Err(error) = result {
                 bail!("Failed to execute instruction ({instruction}): {error}");
@@ -321,6 +331,8 @@ impl<N: Network> StackExecute<N> for Stack<N> {
             &output_types,
             &output_registers,
         );
+        println!("request tvk: {:?}", request.tvk());
+        println!("request tcm: {:?}", request.tcm());
         lap!(timer, "Construct the response");
 
         #[cfg(debug_assertions)]
@@ -355,11 +367,12 @@ impl<N: Network> StackExecute<N> for Stack<N> {
                 for operand in command.operands() {
                     // Retrieve the finalize input.
                     let value = registers.load_circuit(self, operand)?;
-                    // Ensure the value is a literal or a struct.
+                    // Ensure the value is a literal, struct, or array.
                     // See `RegisterTypes::initialize_function_types()` for the same set of checks.
                     match value {
-                        circuit::Value::Plaintext(circuit::Plaintext::Literal(..)) => (),
-                        circuit::Value::Plaintext(circuit::Plaintext::Struct(..)) => (),
+                        circuit::Value::Plaintext(circuit::Plaintext::Literal(..))
+                        | circuit::Value::Plaintext(circuit::Plaintext::Struct(..))
+                        | circuit::Value::Plaintext(circuit::Plaintext::Array(..)) => (),
                         circuit::Value::Record(..) => {
                             bail!(
                                 "'{}/{}' attempts to pass a 'record' into 'finalize'",

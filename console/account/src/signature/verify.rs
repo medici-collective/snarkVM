@@ -19,6 +19,8 @@ impl<N: Network> Signature<N> {
     ///     challenge' := HashToScalar(G^response pk_sig^challenge, pk_sig, pr_sig, address, message)
     pub fn verify(&self, address: &Address<N>, message: &[Field<N>]) -> bool {
         // Ensure the number of field elements does not exceed the maximum allowed size.
+        println!("Inside verify signature...");
+        println!("__________________________________");
         if message.len() > N::MAX_DATA_SIZE_IN_FIELDS as usize {
             eprintln!("Cannot sign the signature: the signed message exceeds maximum allowed size");
             return false;
@@ -32,10 +34,41 @@ impl<N: Network> Signature<N> {
         // Compute `g_r` := (response * G) + (challenge * pk_sig).
         let g_r = N::g_scalar_multiply(&self.response) + (pk_sig * self.challenge);
 
+        println!("__________________________________");
+        println!("SELF.CHALLENGE{:?}", self.challenge);
+        println!("__________________________________");
+        println!("G_R INSIDE SIG::VERIFY: {:?}", g_r);
+
+        println!("MESSAGE INSIDE SIGNATURE VERIFY {:?}", message);
+        println!("__________________________________");
+
+        println!("PK SIG INSIDE SIG::VERIFY: {:?}", pk_sig);
+        println!("__________________________________");
+
+        println!("PR SIG INSIDE SIG::VERIFY: {:?}", pr_sig);
+        println!("__________________________________");
+
+        println!("Address INSIDE SIG::VERIFY: {:?}", address);
+        println!("__________________________________");
+
+        println!("COMPUTE KEY INSIDE Request::Sign: {:?}",self.compute_key);
+        println!("__________________________________");
+
         // Construct the hash input as (r * G, pk_sig, pr_sig, address, message).
         let mut preimage = Vec::with_capacity(4 + message.len());
+        println!("__________________________________");
+        println!("PREIMAGE AFTER VEC INITIALIZATION: {:?}", preimage);
         preimage.extend([g_r, pk_sig, pr_sig, **address].map(|point| point.to_x_coordinate()));
+        println!("__________________________________");
+        println!("PREIMAGE AFTER EXTEND: {:?}", preimage);
+        println!("__________________________________");
+
+        println!("PK SIG INSIDE SIG::VERIFY: {:?}", pk_sig);
         preimage.extend(message);
+
+        println!("__________________________________");
+        println!("PREIMAGE: {:?}", preimage);
+        println!("__________________________________");
 
         // Hash to derive the verifier challenge, and return `false` if this operation fails.
         let candidate_challenge = match N::hash_to_scalar_psd8(&preimage) {
@@ -52,6 +85,14 @@ impl<N: Network> Signature<N> {
             // Return `false` if the address errored.
             Err(_) => return false,
         };
+
+        println!("SIGNATURE BEFOR CHECKING VERIFICATION {:?}", self);
+        println!("__________________________________");
+
+        println!("challenge: {:?} candidate_challenge: {:?}", self.challenge, candidate_challenge);
+        println!("__________________________________");
+        println!("address: {:?} candidate_address: {:?}", *address, candidate_address);
+        println!("__________________________________");
 
         // Return `true` if the candidate challenge and address are correct.
         self.challenge == candidate_challenge && *address == candidate_address

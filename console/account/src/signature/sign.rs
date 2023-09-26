@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::*;
+use std::collections::HashMap;
 
 impl<N: Network> Signature<N> {
     /// Returns a signature `(challenge, response, compute_key)` for a given message and RNG, where:
@@ -20,6 +21,7 @@ impl<N: Network> Signature<N> {
     ///     response := nonce - challenge * private_key.sk_sig()
     pub fn sign<R: Rng + CryptoRng>(private_key: &PrivateKey<N>, message: &[Field<N>], rng: &mut R) -> Result<Self> {
         // Ensure the number of field elements does not exceed the maximum allowed size.
+        println!("INSIDE SIGNATURE SIGNING....");
         if message.len() > N::MAX_DATA_SIZE_IN_FIELDS as usize {
             bail!("Cannot sign the message: the message exceeds maximum allowed size")
         }
@@ -44,10 +46,37 @@ impl<N: Network> Signature<N> {
         preimage.extend([g_r, pk_sig, pr_sig, *address].map(|point| point.to_x_coordinate()));
         preimage.extend(message);
 
+        println!("PREIMAGE BEFORE HASH TO SCALAR: {:?}", preimage);
+
+        // println!("-------------------------");
+
+        // let mut my_dict: HashMap<String, Value<N>> = HashMap::new();
+
+        // for (index, field) in message.clone().into_iter().enumerate() {
+        //     let lit = Literal::Field(field);
+        //     let val = Value::from(&lit); // assuming the conversion takes a reference
+        //     let key = format!("field_{}", index + 1);  // generate key in the format "field_i"
+        //     my_dict.insert(key, val);
+        // }
+
+
+        // let string_representation: String = my_dict.iter()
+        // .map(|(k, v)| (k, k.trim_start_matches("field_").parse::<usize>().unwrap_or(0), v)) // extract numeric part
+        // .sorted_by(|(_, a_num, _), (_, b_num, _)| a_num.cmp(b_num)) // sort by the numeric part
+        // .map(|(key, _, value)| format!("  {}: {:?}", key, value)) // Use Debug trait for formatting
+        // .collect::<Vec<String>>()
+        // .join(",\n");
+
         // Compute the verifier challenge.
         let challenge = N::hash_to_scalar_psd8(&preimage)?;
+
+        println!("CHALLENGE: {:?}", challenge);
         // Compute the prover response.
         let response = nonce - (challenge * private_key.sk_sig());
+
+        let sig = Self::from((challenge, response, compute_key));
+
+        println!("SIGNATURE {:?}", sig);
 
         // Output the signature.
         Ok(Self { challenge, response, compute_key })

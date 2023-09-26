@@ -1,0 +1,13 @@
+[package]
+name = "sig-generation"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+snarkvm = "^0.14.6"
+snarkvm-console-account = "^0.14.6"
+snarkvm-console-network = "^0.14.6"
+snarkvm-console-program = "^0.14.6"
+

@@ -16,6 +16,8 @@ mod build;
 mod clean;
 mod deploy;
 mod execute;
+mod frost_execute;
+mod message;
 mod is_build_required;
 mod run;
 
@@ -150,12 +152,14 @@ impl<N: Network> Package<N> {
     /// Returns a new process for the package.
     pub fn get_process(&self) -> Result<Process<N>> {
         // Create the process.
+        println!("Inside getting process...");
         let mut process = Process::load()?;
 
         // Prepare the imports directory.
         let imports_directory = self.imports_directory();
 
         // Add all import programs (in order) to the process.
+        println!("Adding all import programs to the process...");
         self.program().imports().keys().try_for_each(|program_id| {
             // Open the Aleo program file.
             let import_program_file = AleoFile::open(&imports_directory, program_id, false)?;
@@ -165,6 +169,7 @@ impl<N: Network> Package<N> {
         })?;
 
         // Add the program to the process.
+        println!("Adding the program to the process...");
         process.add_program(self.program())?;
 
         Ok(process)

@@ -36,13 +36,21 @@ impl Execute {
         // Derive the program directory path.
         let path = std::env::current_dir()?;
 
+        println!("CLI Executing....");
+
         // Load the package.
         let package = Package::open(&path)?;
         // Load the private key.
+        // todo (ab): Looking for private key here, may have to remove...
         let private_key = crate::cli::helpers::dotenv_private_key()?;
 
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
+
+        /*
+         * todo (ab): we have inputs all the way back here... so we could just create a new cli method "generate message"
+         * generate the message. and then create the full stack of functions with new fn sigs that take in a "message"
+         */
 
         // Execute the request.
         let (response, execution, metrics) =

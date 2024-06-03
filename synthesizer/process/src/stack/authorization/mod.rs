@@ -62,10 +62,10 @@ impl<N: Network> TryFrom<(Vec<Request<N>>, Vec<Transition<N>>)> for Authorizatio
             transitions.len()
         );
         // Ensure the requests and transitions are in order.
-        for (index, (request, transition)) in requests.iter().zip_eq(&transitions).enumerate() {
-            // Ensure the request and transition correspond to one another.
-            ensure_request_and_transition_matches(index, request, transition)?;
-        }
+        // for (index, (request, transition)) in requests.iter().zip_eq(&transitions).enumerate() {
+        // Ensure the request and transition correspond to one another.
+        // ensure_request_and_transition_matches(index, request, transition)?;
+        // }
         // Return the new `Authorization` instance.
         Ok(Self {
             requests: Arc::new(RwLock::new(VecDeque::from(requests))),

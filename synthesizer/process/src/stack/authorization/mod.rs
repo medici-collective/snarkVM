@@ -63,7 +63,7 @@ impl<N: Network> TryFrom<(Vec<Request<N>>, Vec<Transition<N>>)> for Authorizatio
         );
         println!("requests: {requests:?}");
         // Move the first request to the back in order to match the transitions.
-        let mut requests_deque = VecDeque::from(requests);
+        let mut requests_deque = VecDeque::from(requests.clone());
         if let Some(first_request) = requests_deque.pop_front() {
             println!("first_request: {first_request}");
             requests_deque.push_back(first_request);
@@ -76,7 +76,7 @@ impl<N: Network> TryFrom<(Vec<Request<N>>, Vec<Transition<N>>)> for Authorizatio
         }
         // Return the new `Authorization` instance.
         Ok(Self {
-            requests: Arc::new(RwLock::new(requests_deque)),
+            requests: Arc::new(RwLock::new(VecDeque::from(requests))),
             transitions: Arc::new(RwLock::new(IndexMap::from_iter(
                 transitions.into_iter().map(|transition| (*transition.id(), transition)),
             ))),

@@ -61,10 +61,13 @@ impl<N: Network> TryFrom<(Vec<Request<N>>, Vec<Transition<N>>)> for Authorizatio
             requests.len(),
             transitions.len()
         );
+        println!("requests: {requests:?}");
         // Move the first request to the back in order to match the transitions.
         let mut requests_deque = VecDeque::from(requests);
         if let Some(first_request) = requests_deque.pop_front() {
+            println!("first_request: {first_request}");
             requests_deque.push_back(first_request);
+            println!("post-push: {requests_deque:?}");
         }
         // Ensure the requests and transitions are in order.
         for (index, (request, transition)) in requests_deque.iter().zip_eq(&transitions).enumerate() {

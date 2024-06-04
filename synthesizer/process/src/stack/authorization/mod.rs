@@ -61,14 +61,19 @@ impl<N: Network> TryFrom<(Vec<Request<N>>, Vec<Transition<N>>)> for Authorizatio
             requests.len(),
             transitions.len()
         );
+        // Move the first request to the back in order to match the transitions.
+        let mut requests_deque = VecDeque::from(requests);
+        if let Some(first_request) = requests_deque.pop_front() {
+          requests_deque.push_back(first_request);
+        }
         // Ensure the requests and transitions are in order.
-        // for (index, (request, transition)) in requests.iter().zip_eq(&transitions).enumerate() {
-        // Ensure the request and transition correspond to one another.
-        // ensure_request_and_transition_matches(index, request, transition)?;
-        // }
+        for (index, (request, transition)) in requests_deque.iter().zip_eq(&transitions).enumerate() {
+            // Ensure the request and transition correspond to one another.
+            ensure_request_and_transition_matches(index, request, transition)?;
+        }
         // Return the new `Authorization` instance.
         Ok(Self {
-            requests: Arc::new(RwLock::new(VecDeque::from(requests))),
+            requests: Arc::new(RwLock::new(requests_deque)),
             transitions: Arc::new(RwLock::new(IndexMap::from_iter(
                 transitions.into_iter().map(|transition| (*transition.id(), transition)),
             ))),

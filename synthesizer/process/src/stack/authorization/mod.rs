@@ -68,8 +68,8 @@ impl<N: Network> TryFrom<(Vec<Request<N>>, Vec<Transition<N>>)> for Authorizatio
         // }
         // Ensure the requests and transitions are in order.
         // for (index, (request, transition)) in requests_deque.iter().zip_eq(&transitions).enumerate() {
-        // Ensure the request and transition correspond to one another.
-        // ensure_request_and_transition_matches(index, request, transition)?;
+        //      Ensure the request and transition correspond to one another.
+        //      ensure_request_and_transition_matches(index, request, transition)?;
         // }
         // Return the new `Authorization` instance.
         Ok(Self {

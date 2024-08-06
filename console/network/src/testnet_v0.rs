@@ -129,13 +129,15 @@ impl Network for TestnetV0 {
     type TransactionID = AleoID<Field<Self>, { hrp2!(TRANSACTION_PREFIX) }>;
     /// The transition ID type.
     type TransitionID = AleoID<Field<Self>, { hrp2!("au") }>;
+    /// The transmission checksum type.
+    type TransmissionChecksum = u128;
 
     /// The network edition.
     const EDITION: u16 = 0;
     /// The genesis block coinbase target.
-    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 10).saturating_sub(1);
+    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 29).saturating_sub(1);
     /// The genesis block proof target.
-    const GENESIS_PROOF_TARGET: u64 = 1u64 << 8;
+    const GENESIS_PROOF_TARGET: u64 = 1u64 << 27;
     /// The fixed timestamp of the genesis block.
     const GENESIS_TIMESTAMP: i64 = 1715776496 /* 2024-05-15 12:34:56 UTC */;
     /// The network ID.
@@ -150,6 +152,11 @@ impl Network for TestnetV0 {
     /// Returns the genesis block bytes.
     fn genesis_bytes() -> &'static [u8] {
         snarkvm_parameters::testnet::GenesisBytes::load_bytes()
+    }
+
+    /// Returns the restrictions list as a JSON-compatible string.
+    fn restrictions_list_as_str() -> &'static str {
+        snarkvm_parameters::testnet::RESTRICTIONS_LIST
     }
 
     /// Returns the proving key for the given function name in `credits.aleo`.

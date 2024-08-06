@@ -130,9 +130,25 @@ impl Network for MainnetV0 {
     type TransactionID = AleoID<Field<Self>, { hrp2!(TRANSACTION_PREFIX) }>;
     /// The transition ID type.
     type TransitionID = AleoID<Field<Self>, { hrp2!("au") }>;
+    /// The transmission checksum type.
+    type TransmissionChecksum = u128;
 
     /// The network edition.
     const EDITION: u16 = 0;
+    /// The genesis block coinbase target.
+    #[cfg(not(feature = "test"))]
+    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 29).saturating_sub(1);
+    /// The genesis block coinbase target.
+    /// This is deliberately set to a low value (32) for testing purposes only.
+    #[cfg(feature = "test")]
+    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 5).saturating_sub(1);
+    /// The genesis block proof target.
+    #[cfg(not(feature = "test"))]
+    const GENESIS_PROOF_TARGET: u64 = 1u64 << 27;
+    /// The genesis block proof target.
+    /// This is deliberately set to a low value (8) for testing purposes only.
+    #[cfg(feature = "test")]
+    const GENESIS_PROOF_TARGET: u64 = 1u64 << 3;
     /// The fixed timestamp of the genesis block.
     const GENESIS_TIMESTAMP: i64 = 1696118400 /* 2023-10-01 00:00:00 UTC */;
     /// The network ID.
@@ -140,13 +156,18 @@ impl Network for MainnetV0 {
     /// The function name for the inclusion circuit.
     const INCLUSION_FUNCTION_NAME: &'static str = snarkvm_parameters::mainnet::NETWORK_INCLUSION_FUNCTION_NAME;
     /// The maximum number of certificates in a batch.
-    const MAX_CERTIFICATES: u16 = 10;
+    const MAX_CERTIFICATES: u16 = 15;
     /// The network name.
     const NAME: &'static str = "Aleo Mainnet (v0)";
 
     /// Returns the genesis block bytes.
     fn genesis_bytes() -> &'static [u8] {
         snarkvm_parameters::mainnet::GenesisBytes::load_bytes()
+    }
+
+    /// Returns the restrictions list as a JSON-compatible string.
+    fn restrictions_list_as_str() -> &'static str {
+        snarkvm_parameters::mainnet::RESTRICTIONS_LIST
     }
 
     /// Returns the proving key for the given function name in `credits.aleo`.

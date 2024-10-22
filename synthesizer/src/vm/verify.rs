@@ -236,11 +236,20 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
                         // Compute the execution cost.
                         let (cost, _) = execution_cost(&self.process().read(), execution)?;
                         // Ensure the fee is sufficient to cover the cost.
-                        if *fee.base_amount()? < cost {
+                        let base_amount = *fee.base_amount()?;  // Get the amount once to avoid multiple ? operations
+                        if base_amount < cost {
+                            trace!(
+                                "Transaction '{}' fee check failed - base amount: {}, required cost: {}",
+                                id,
+                                base_amount,
+                                cost
+                            );
                             bail!(
-                                "Transaction '{id}' has an insufficient base fee (execution) - requires {cost} microcredits"
+                                "Transaction '{id}' has an insufficient base fee (execution) - requires {cost} microcredits",
+                                id = id,
+                                cost = cost
                             )
-                        }
+                      }
                     } else {
                         // Ensure the base fee amount is zero.
                         ensure!(*fee.base_amount()? == 0, "Transaction '{id}' has a non-zero base fee (execution)");

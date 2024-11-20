@@ -45,7 +45,7 @@ macro_rules! impl_primefield_standard_sample {
                 loop {
                     let mut tmp = $field(rng.sample(rand::distributions::Standard), PhantomData);
                     // Mask away the unused bits at the beginning.
-                    tmp.0.as_mut().last_mut().map(|val| *val &= std::u64::MAX >> P::REPR_SHAVE_BITS);
+                    tmp.0.as_mut().last_mut().map(|val| *val &= u64::MAX >> P::REPR_SHAVE_BITS);
 
                     if tmp.is_valid() {
                         return tmp;
@@ -193,7 +193,7 @@ macro_rules! impl_primefield_serializer {
                 mut writer: W,
                 flags: F,
             ) -> Result<(), snarkvm_utilities::serialize::SerializationError> {
-                use snarkvm_utilities::serialize::{number_of_bits_and_bytes, SerializationError};
+                use snarkvm_utilities::serialize::{SerializationError, number_of_bits_and_bytes};
                 // All reasonable `Flags` should be less than 8 bits in size
                 // (256 values are enough for anyone!)
                 if F::BIT_SIZE > 8 {

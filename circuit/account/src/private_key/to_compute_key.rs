@@ -22,10 +22,10 @@ impl<A: Aleo> PrivateKey<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
-    use crate::{helpers::generate_account, Circuit};
+    use crate::{Circuit, helpers::generate_account};
 
     use anyhow::Result;
 
@@ -45,7 +45,7 @@ mod tests {
             // Initialize the private key.
             let candidate = PrivateKey::<Circuit>::new(mode, private_key);
 
-            Circuit::scope(&format!("{mode} {i}"), || {
+            Circuit::scope(format!("{mode} {i}"), || {
                 let candidate = candidate.to_compute_key();
                 assert_eq!(compute_key, candidate.eject_value());
                 // TODO (howardwu): Resolve skipping the cost count checks for the burn-in round.

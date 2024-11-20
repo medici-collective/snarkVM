@@ -32,7 +32,7 @@ fn test_process_execute() {
     // Load the tests.
     let tests = load_tests::<_, ProgramTest>("./tests/process/execute", "./expectations/process/execute");
     // Initialize a process.
-    let process = Process::<CurrentNetwork>::load().unwrap();
+    let process = Process::<CurrentNetwork>::load_testing_only().unwrap();
 
     // Run each test and compare it against its corresponding expectation.
     tests.par_iter().for_each(|test| {
@@ -59,7 +59,7 @@ fn run_test(process: Process<CurrentNetwork>, test: &ProgramTest) -> serde_yaml:
     for program in test.programs() {
         if let Err(err) = process.add_program(program) {
             output
-                .get_mut(&serde_yaml::Value::String("errors".to_string()))
+                .get_mut(serde_yaml::Value::String("errors".to_string()))
                 .unwrap()
                 .as_sequence_mut()
                 .unwrap()

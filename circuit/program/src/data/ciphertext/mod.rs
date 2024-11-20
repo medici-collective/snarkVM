@@ -24,14 +24,14 @@ mod to_fields;
 
 use crate::{Plaintext, Visibility};
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Boolean, Field};
+use snarkvm_circuit_types::{Boolean, Field, environment::prelude::*};
 
 use core::ops::Deref;
 
 #[derive(Clone)]
 pub struct Ciphertext<A: Aleo>(Vec<Field<A>>);
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for Ciphertext<A> {
     type Primitive = console::Ciphertext<A::Network>;
 
@@ -45,7 +45,7 @@ impl<A: Aleo> Inject for Ciphertext<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for Ciphertext<A> {
     type Primitive = console::Ciphertext<A::Network>;
 

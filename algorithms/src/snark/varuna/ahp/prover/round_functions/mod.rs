@@ -16,9 +16,9 @@
 use crate::{
     r1cs::ConstraintSynthesizer,
     snark::varuna::{
-        ahp::{indexer::Circuit, AHPError, AHPForR1CS},
-        prover,
         SNARKMode,
+        ahp::{AHPError, AHPForR1CS, indexer::Circuit},
+        prover,
     },
 };
 use snarkvm_fields::PrimeField;
@@ -29,9 +29,7 @@ use rand::Rng;
 use rand_core::CryptoRng;
 use std::collections::BTreeMap;
 
-use snarkvm_utilities::cfg_iter;
-#[cfg(not(feature = "std"))]
-use snarkvm_utilities::println;
+use snarkvm_utilities::{cfg_iter, println};
 
 #[cfg(not(feature = "serial"))]
 use rayon::prelude::*;

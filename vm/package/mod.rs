@@ -29,7 +29,7 @@ use crate::{
         network::Network,
         program::{Identifier, Locator, ProgramID, Response, Value},
     },
-    file::{AVMFile, AleoFile, Manifest, ProverFile, VerifierFile, README},
+    file::{AVMFile, AleoFile, Manifest, ProverFile, README, VerifierFile},
     ledger::{block::Execution, query::Query, store::helpers::memory::BlockMemory},
     prelude::{Deserialize, Deserializer, Serialize, SerializeStruct, Serializer},
     synthesizer::{
@@ -39,7 +39,7 @@ use crate::{
     },
 };
 
-use anyhow::{bail, ensure, Error, Result};
+use anyhow::{Error, Result, bail, ensure};
 use core::str::FromStr;
 use rand::{CryptoRng, Rng};
 use std::path::{Path, PathBuf};
@@ -151,7 +151,7 @@ impl<N: Network> Package<N> {
     /// Returns a new process for the package.
     pub fn get_process(&self) -> Result<Process<N>> {
         // Create the process.
-        let mut process = Process::load()?;
+        let mut process = Process::load_testing_only()?;
 
         // Prepare the imports directory.
         let imports_directory = self.imports_directory();

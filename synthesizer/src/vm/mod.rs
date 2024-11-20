@@ -22,7 +22,7 @@ mod execute;
 mod finalize;
 mod verify;
 
-use crate::{cast_mut_ref, cast_ref, convert, process, Restrictions};
+use crate::{Restrictions, cast_mut_ref, cast_ref, convert, process};
 use console::{
     account::{Address, PrivateKey},
     network::prelude::*,
@@ -47,19 +47,18 @@ use ledger_block::{
 use ledger_committee::Committee;
 use ledger_narwhal_data::Data;
 use ledger_puzzle::Puzzle;
-use ledger_query::Query;
+use ledger_query::{Query, QueryTrait};
 use ledger_store::{
-    atomic_finalize,
     BlockStore,
     ConsensusStorage,
     ConsensusStore,
     FinalizeMode,
     FinalizeStore,
-    TransactionStorage,
     TransactionStore,
     TransitionStore,
+    atomic_finalize,
 };
-use synthesizer_process::{deployment_cost, execution_cost, Authorization, Process, Trace};
+use synthesizer_process::{Authorization, Process, Trace, deployment_cost, execution_cost_v1, execution_cost_v2};
 use synthesizer_program::{FinalizeGlobalState, FinalizeOperation, FinalizeStoreTrait, Program};
 use utilities::try_vm_runtime;
 
@@ -68,7 +67,7 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Either;
 use lru::LruCache;
 use parking_lot::{Mutex, RwLock};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 use std::{collections::HashSet, num::NonZeroUsize, sync::Arc};
 
 #[cfg(not(feature = "serial"))]
@@ -97,7 +96,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
     #[inline]
     pub fn from(store: ConsensusStore<N, C>) -> Result<Self> {
         // Initialize a new process.
-        let mut process = Process::load()?;
+        let process = Process::load_from_storage(Some(store.storage_mode().clone()))?;
 
         // Initialize the store for 'credits.aleo'.
         let credits = Program::<N>::credits()?;
@@ -106,83 +105,6 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
             if !store.finalize_store().contains_mapping_confirmed(credits.id(), mapping.name())? {
                 // Initialize the mappings for 'credits.aleo'.
                 store.finalize_store().initialize_mapping(*credits.id(), *mapping.name())?;
-            }
-        }
-
-        // A helper function to retrieve all the deployments.
-        fn load_deployment_and_imports<N: Network, T: TransactionStorage<N>>(
-            process: &Process<N>,
-            transaction_store: &TransactionStore<N, T>,
-            transaction_id: N::TransactionID,
-        ) -> Result<Vec<(ProgramID<N>, Deployment<N>)>> {
-            // Retrieve the deployment from the transaction ID.
-            let deployment = match transaction_store.get_deployment(&transaction_id)? {
-                Some(deployment) => deployment,
-                None => bail!("Deployment transaction '{transaction_id}' is not found in storage."),
-            };
-
-            // Fetch the program from the deployment.
-            let program = deployment.program();
-            let program_id = program.id();
-
-            // Return early if the program is already loaded.
-            if process.contains_program(program_id) {
-                return Ok(vec![]);
-            }
-
-            // Prepare a vector for the deployments.
-            let mut deployments = vec![];
-
-            // Iterate through the program imports.
-            for import_program_id in program.imports().keys() {
-                // Add the imports to the process if does not exist yet.
-                if !process.contains_program(import_program_id) {
-                    // Fetch the deployment transaction ID.
-                    let Some(transaction_id) =
-                        transaction_store.deployment_store().find_transaction_id_from_program_id(import_program_id)?
-                    else {
-                        bail!("Transaction ID for '{program_id}' is not found in storage.");
-                    };
-
-                    // Add the deployment and its imports found recursively.
-                    deployments.extend_from_slice(&load_deployment_and_imports(
-                        process,
-                        transaction_store,
-                        transaction_id,
-                    )?);
-                }
-            }
-
-            // Once all the imports have been included, add the parent deployment.
-            deployments.push((*program_id, deployment));
-
-            Ok(deployments)
-        }
-
-        // Retrieve the transaction store.
-        let transaction_store = store.transaction_store();
-        // Retrieve the list of deployment transaction IDs.
-        let deployment_ids = transaction_store.deployment_transaction_ids().collect::<Vec<_>>();
-        // Load the deployments from the store.
-        for (i, chunk) in deployment_ids.chunks(256).enumerate() {
-            debug!(
-                "Loading deployments {}-{} (of {})...",
-                i * 256,
-                ((i + 1) * 256).min(deployment_ids.len()),
-                deployment_ids.len()
-            );
-            let deployments = cfg_iter!(chunk)
-                .map(|transaction_id| {
-                    // Load the deployment and its imports.
-                    load_deployment_and_imports(&process, transaction_store, **transaction_id)
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            for (program_id, deployment) in deployments.iter().flatten() {
-                // Load the deployment if it does not exist in the process yet.
-                if !process.contains_program(program_id) {
-                    process.load_deployment(deployment)?;
-                }
             }
         }
 
@@ -361,7 +283,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
         let state = FinalizeGlobalState::new_genesis::<N>()?;
         // Speculate on the ratifications, solutions, and transactions.
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) =
-            self.speculate(state, None, ratifications, &solutions, transactions.iter(), rng)?;
+            self.speculate(state, 0, None, ratifications, &solutions, transactions.iter(), rng)?;
         ensure!(
             aborted_transaction_ids.is_empty(),
             "Failed to initialize a genesis block - found aborted transaction IDs"
@@ -443,19 +365,15 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
                     // Note: This call is guaranteed to succeed (without error), because `DISCARD_BATCH == true`.
                     self.block_store().unpause_atomic_writes::<true>()?;
                     // Rollback the Merkle tree.
-                    self.block_store().remove_last_n_from_tree_only(1).map_err(|removal_error| {
+                    self.block_store().remove_last_n_from_tree_only(1).inspect_err(|_| {
                         // Log the finalize error.
                         error!("Failed to finalize block {} - {finalize_error}", block.height());
-                        // Return the removal error.
-                        removal_error
                     })?;
                 } else {
                     // Rollback the block.
-                    self.block_store().remove_last_n(1).map_err(|removal_error| {
+                    self.block_store().remove_last_n(1).inspect_err(|_| {
                         // Log the finalize error.
                         error!("Failed to finalize block {} - {finalize_error}", block.height());
-                        // Return the removal error.
-                        removal_error
                     })?;
                 }
                 // Return the finalize error.
@@ -483,7 +401,6 @@ pub(crate) mod test_helpers {
 
     use indexmap::IndexMap;
     use once_cell::sync::OnceCell;
-    use std::borrow::Borrow;
     #[cfg(feature = "rocks")]
     use std::path::Path;
     use synthesizer_snark::VerifyingKey;
@@ -758,6 +675,36 @@ function compute:
             .clone()
     }
 
+    #[cfg(feature = "test")]
+    pub(crate) fn create_new_transaction_with_different_fee(
+        rng: &mut TestRng,
+        transaction: Transaction<CurrentNetwork>,
+        fee: u64,
+    ) -> Transaction<CurrentNetwork> {
+        // Initialize a new caller.
+        let caller_private_key = crate::vm::test_helpers::sample_genesis_private_key(rng);
+
+        // Initialize the genesis block.
+        let genesis = crate::vm::test_helpers::sample_genesis_block(rng);
+
+        // Initialize the VM.
+        let vm = sample_vm();
+        // Update the VM.
+        vm.add_next_block(&genesis).unwrap();
+
+        // Get Execution
+        let execution = transaction.execution().unwrap().clone();
+
+        // Authorize the fee.
+        let authorization =
+            vm.authorize_fee_public(&caller_private_key, fee, 100, execution.to_execution_id().unwrap(), rng).unwrap();
+        // Compute the fee.
+        let fee = vm.execute_fee_authorization(authorization, None, rng).unwrap();
+
+        // Construct the transaction.
+        Transaction::from_execution(execution, Some(fee)).unwrap()
+    }
+
     pub fn sample_next_block<R: Rng + CryptoRng>(
         vm: &VM<MainnetV0, ConsensusMemory<MainnetV0>>,
         private_key: &PrivateKey<MainnetV0>,
@@ -765,13 +712,20 @@ function compute:
         rng: &mut R,
     ) -> Result<Block<MainnetV0>> {
         // Get the most recent block.
-        let block_hash =
-            vm.block_store().get_block_hash(*vm.block_store().heights().max().unwrap().borrow()).unwrap().unwrap();
+        let block_hash = vm.block_store().get_block_hash(vm.block_store().max_height().unwrap()).unwrap().unwrap();
         let previous_block = vm.block_store().get_block(&block_hash).unwrap().unwrap();
 
         // Construct the new block header.
-        let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) =
-            vm.speculate(sample_finalize_state(1), None, vec![], &None.into(), transactions.iter(), rng)?;
+        let time_since_last_block = MainnetV0::BLOCK_TIME as i64;
+        let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = vm.speculate(
+            sample_finalize_state(1),
+            time_since_last_block,
+            None,
+            vec![],
+            &None.into(),
+            transactions.iter(),
+            rng,
+        )?;
 
         // Construct the metadata associated with the block.
         let metadata = Metadata::new(
@@ -784,7 +738,7 @@ function compute:
             MainnetV0::GENESIS_PROOF_TARGET,
             previous_block.last_coinbase_target(),
             previous_block.last_coinbase_timestamp(),
-            MainnetV0::GENESIS_TIMESTAMP + 1,
+            previous_block.timestamp().saturating_add(time_since_last_block),
         )?;
 
         let header = Header::from(

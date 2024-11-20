@@ -17,14 +17,14 @@
 use snarkvm_circuit_types::environment::assert_scope;
 
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Field};
+use snarkvm_circuit_types::{Field, environment::prelude::*};
 
 pub struct GraphKey<A: Aleo> {
     /// The graph key `sk_tag` := Hash(view_key || ctr).
     sk_tag: Field<A>,
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for GraphKey<A> {
     type Primitive = console::GraphKey<A::Network>;
 
@@ -44,7 +44,7 @@ impl<A: Aleo> GraphKey<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for GraphKey<A> {
     type Primitive = console::GraphKey<A::Network>;
 
@@ -62,10 +62,10 @@ impl<A: Aleo> Eject for GraphKey<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 pub(crate) mod tests {
     use super::*;
-    use crate::{helpers::generate_account, Circuit};
+    use crate::{Circuit, helpers::generate_account};
 
     use anyhow::Result;
 

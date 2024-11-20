@@ -24,13 +24,13 @@ use console::{
     program::{Identifier, Literal, LiteralType, Plaintext, Register, Value},
 };
 use snarkvm_synthesizer_program::{
-    CommitBHP1024,
     CommitBHP256,
     CommitBHP512,
     CommitBHP768,
+    CommitBHP1024,
     CommitInstruction,
-    CommitPED128,
     CommitPED64,
+    CommitPED128,
     Opcode,
     Operand,
     Program,
@@ -93,7 +93,7 @@ fn sample_stack(
     let operands = vec![operand_a, operand_b];
 
     // Initialize the stack.
-    let stack = Stack::new(&Process::load()?, &program)?;
+    let stack = Stack::new(&Process::load_testing_only()?, &program)?;
 
     Ok((stack, operands, r2))
 }

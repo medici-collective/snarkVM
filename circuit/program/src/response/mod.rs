@@ -19,9 +19,9 @@ use snarkvm_circuit_types::environment::assert_scope;
 mod from_outputs;
 mod process_outputs_from_callback;
 
-use crate::{compute_function_id, Identifier, ProgramID, Value};
+use crate::{Identifier, ProgramID, Value, compute_function_id};
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Field, U16};
+use snarkvm_circuit_types::{Field, U16, environment::prelude::*};
 
 pub enum OutputID<A: Aleo> {
     /// The hash of the constant output.
@@ -38,7 +38,7 @@ pub enum OutputID<A: Aleo> {
     Future(Field<A>),
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for OutputID<A> {
     type Primitive = console::OutputID<A::Network>;
 
@@ -127,7 +127,7 @@ impl<A: Aleo> OutputID<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for OutputID<A> {
     type Primitive = console::OutputID<A::Network>;
 
@@ -177,7 +177,7 @@ impl<A: Aleo> Response<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for Response<A> {
     type Primitive = console::Response<A::Network>;
 

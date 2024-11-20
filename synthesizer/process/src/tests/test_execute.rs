@@ -14,34 +14,34 @@
 // limitations under the License.
 
 use crate::{
-    traits::{StackEvaluate, StackExecute},
     CallStack,
     Process,
     Stack,
     Trace,
+    traits::{StackEvaluate, StackExecute},
 };
-use circuit::{network::AleoV0, Aleo};
+use circuit::{Aleo, network::AleoV0};
 use console::{
     account::{Address, PrivateKey, ViewKey},
-    network::{prelude::*, MainnetV0},
+    network::{MainnetV0, prelude::*},
     program::{Identifier, Literal, Plaintext, ProgramID, Record, Value},
     types::{Field, U64},
 };
 use ledger_block::{Fee, Transaction};
 use ledger_query::Query;
 use ledger_store::{
-    helpers::memory::{BlockMemory, FinalizeMemory},
     BlockStorage,
     BlockStore,
     FinalizeStorage,
     FinalizeStore,
+    helpers::memory::{BlockMemory, FinalizeMemory},
 };
+use lru::LruCache;
 use synthesizer_program::{FinalizeGlobalState, FinalizeStoreTrait, Program, StackProgram};
 use synthesizer_snark::UniversalSRS;
 
-use indexmap::IndexMap;
-use parking_lot::RwLock;
-use std::sync::Arc;
+use parking_lot::{Mutex, RwLock};
+use std::{num::NonZeroUsize, sync::Arc};
 
 type CurrentNetwork = MainnetV0;
 type CurrentAleo = AleoV0;
@@ -494,7 +494,7 @@ fn test_process_execute_transfer_public_to_private() {
     let r1 = Value::<CurrentNetwork>::from_str("99_000_000_000_000_u64").unwrap();
 
     // Construct the process.
-    let process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Authorize the function call.
     let authorization = process
@@ -1239,7 +1239,7 @@ finalize compute:
     process.synthesize_key::<CurrentAleo, _>(program.id(), &function_name, rng).unwrap();
 
     // Reset the process.
-    let mut process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Initialize a new block store.
     let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
@@ -1352,7 +1352,7 @@ finalize compute:
     process.synthesize_key::<CurrentAleo, _>(program.id(), &function_name, rng).unwrap();
 
     // Reset the process.
-    let mut process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Initialize a new block store.
     let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
@@ -1479,7 +1479,7 @@ finalize mint_public:
     process.synthesize_key::<CurrentAleo, _>(program.id(), &function_name, rng).unwrap();
 
     // Reset the process.
-    let mut process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Initialize a new block store.
     let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
@@ -1608,7 +1608,7 @@ finalize mint_public:
     process.synthesize_key::<CurrentAleo, _>(program0.id(), &function_name, rng).unwrap();
 
     // Reset the process.
-    let mut process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Initialize a new block store.
     let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
@@ -1766,7 +1766,7 @@ finalize compute:
     process.synthesize_key::<CurrentAleo, _>(program.id(), &function_name, rng).unwrap();
 
     // Reset the process.
-    let mut process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Initialize a new block store.
     let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
@@ -2195,7 +2195,7 @@ finalize compute:
     process.synthesize_key::<CurrentAleo, _>(program.id(), &function_name, rng).unwrap();
 
     // Reset the process.
-    let mut process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Initialize a new block store.
     let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
@@ -2364,11 +2364,15 @@ fn test_process_deploy_credits_program() {
     let rng = &mut TestRng::default();
 
     // Initialize an empty process without the `credits` program.
-    let empty_process =
-        Process { universal_srs: Arc::new(UniversalSRS::<CurrentNetwork>::load().unwrap()), stacks: IndexMap::new() };
+    let empty_process = Process {
+        universal_srs: Arc::new(UniversalSRS::<CurrentNetwork>::load().unwrap()),
+        credits: None,
+        stacks: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(CurrentNetwork::MAX_STACKS).unwrap()))),
+        store: None,
+    };
 
     // Construct the process.
-    let process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Fetch the credits program
     let program = Program::credits().unwrap();
@@ -2422,7 +2426,7 @@ function {function_name}:
     .unwrap();
 
     // Reset the process.
-    let mut process = Process::load().unwrap();
+    let process = Process::load_testing_only().unwrap();
 
     // Initialize a new block store.
     let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
@@ -2585,7 +2589,7 @@ fn test_long_import_chain_with_calls() {
 #[test]
 fn test_max_imports() {
     // Construct the process.
-    let mut process = Process::<CurrentNetwork>::load().unwrap();
+    let mut process = Process::<CurrentNetwork>::load_testing_only().unwrap();
 
     // Add `MAX_IMPORTS` programs to the process.
     for i in 0..CurrentNetwork::MAX_IMPORTS {
@@ -2636,7 +2640,7 @@ fn test_program_exceeding_transaction_spend_limit() {
     .unwrap();
 
     // Initialize a `Process`.
-    let mut process = Process::<CurrentNetwork>::load().unwrap();
+    let mut process = Process::<CurrentNetwork>::load_testing_only().unwrap();
 
     // Attempt to add the program to the process, which should fail.
     let result = process.add_program(&program);

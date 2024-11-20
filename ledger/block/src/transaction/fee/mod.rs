@@ -203,7 +203,7 @@ pub mod test_helpers {
     use super::*;
     use console::types::Field;
     use ledger_query::Query;
-    use ledger_store::{helpers::memory::BlockMemory, BlockStore};
+    use ledger_store::{BlockStore, helpers::memory::BlockMemory};
     use synthesizer_process::Process;
 
     use once_cell::sync::OnceCell;
@@ -241,7 +241,7 @@ pub mod test_helpers {
         let priority_fee_in_microcredits = 1_000;
 
         // Initialize the process.
-        let process = Process::load().unwrap();
+        let process = Process::load_testing_only().unwrap();
         // Authorize the fee.
         let authorization = process
             .authorize_fee_private::<CurrentAleo, _>(
@@ -298,7 +298,7 @@ pub mod test_helpers {
         let priority_fee = 1_000;
 
         // Initialize the process.
-        let process = Process::load().unwrap();
+        let process = Process::load_testing_only().unwrap();
         // Authorize the fee.
         let authorization = process
             .authorize_fee_public::<CurrentAleo, _>(

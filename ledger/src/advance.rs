@@ -170,6 +170,13 @@ where
         }
     }
 
+    // The `aborted_candidate_solutions` can contain both verified and unverified solutions.
+    // When `check_solution_mut` is used as `verification_fn`, these aborted solutions
+    // may include both mutated and un-mutated variants. This occurs because the verification
+    // check is skipped once the `max_solutions` limit is reached.
+    //
+    // This approach is SAFE because currently, only the `solutionID` of aborted solutions is stored.
+    // However, if full aborted solutions need to be stored in the future, this logic will need to be revisited.
     (valid_candidate_solutions, aborted_candidate_solutions)
 }
 
@@ -288,9 +295,12 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         )?;
 
         // Calculate the coinbase reward.
-        let coinbase_reward = coinbase_reward(
+        let coinbase_reward = coinbase_reward::<N>(
             next_height,
+            next_timestamp,
+            N::GENESIS_TIMESTAMP,
             N::STARTING_SUPPLY,
+            N::ANCHOR_TIME,
             N::ANCHOR_HEIGHT,
             N::BLOCK_TIME,
             combined_proof_target,
@@ -309,6 +319,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // Speculate over the ratifications, solutions, and transactions.
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = self.vm.speculate(
             state,
+            next_timestamp.saturating_sub(previous_block.timestamp()),
             Some(coinbase_reward),
             candidate_ratifications,
             &solutions,

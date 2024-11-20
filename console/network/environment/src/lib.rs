@@ -30,6 +30,7 @@ pub mod prelude {
         environment::*,
         helpers::*,
         traits::{
+            ToBits,
             algorithms::*,
             arithmetic::*,
             bitwise::*,
@@ -54,13 +55,22 @@ pub mod prelude {
                 *,
             },
             visibility::*,
-            ToBits,
         },
     };
 
     pub use snarkvm_curves::{AffineCurve, MontgomeryParameters, ProjectiveCurve, TwistedEdwardsParameters};
     pub use snarkvm_fields::{Field as _, PrimeField as _, SquareRootField as _, Zero as _};
     pub use snarkvm_utilities::{
+        DeserializeExt,
+        FromBits as _,
+        FromBytes,
+        FromBytesDeserializer,
+        LimitedWriter,
+        TestRng,
+        ToBits as _,
+        ToBytes,
+        ToBytesSerializer,
+        Uniform,
         cfg_chunks,
         cfg_find,
         cfg_find_map,
@@ -73,16 +83,6 @@ pub mod prelude {
         error,
         has_duplicates,
         io::{Read, Result as IoResult, Write},
-        DeserializeExt,
-        FromBits as _,
-        FromBytes,
-        FromBytesDeserializer,
-        LimitedWriter,
-        TestRng,
-        ToBits as _,
-        ToBytes,
-        ToBytesSerializer,
-        Uniform,
     };
 
     pub use core::{
@@ -119,30 +119,32 @@ pub mod prelude {
         str::{self, FromStr},
     };
 
-    pub use anyhow::{anyhow, bail, ensure, Error, Result};
+    pub use anyhow::{Error, Result, anyhow, bail, ensure};
     pub use bech32::{self, FromBase32, ToBase32};
     pub use itertools::Itertools;
     pub use nom::{
+        Err,
         branch::alt,
         bytes::{complete::tag, streaming::take},
         character::complete::{alpha1, alphanumeric1, char, one_of},
         combinator::{complete, fail, map, map_res, opt, recognize},
+        error::{ErrorKind, make_error},
         multi::{count, many0, many0_count, many1, separated_list0, separated_list1},
         sequence::{pair, terminated},
     };
     pub use num_traits::{AsPrimitive, One, Pow, Zero};
     pub use rand::{
-        distributions::{Alphanumeric, Distribution, Standard},
         CryptoRng,
         Rng,
+        distributions::{Alphanumeric, Distribution, Standard},
     };
     pub use serde::{
-        de,
-        de::{DeserializeOwned, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
-        ser::{self, SerializeSeq, SerializeStruct},
         Deserialize,
         Deserializer,
         Serialize,
         Serializer,
+        de,
+        de::{DeserializeOwned, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
+        ser::{self, SerializeSeq, SerializeStruct},
     };
 }

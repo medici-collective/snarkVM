@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{get_expectation_path, print_difference, CurrentNetwork, ExpectedTest};
+use crate::{CurrentNetwork, ExpectedTest, get_expectation_path, print_difference};
 
 use console::{account::PrivateKey, program::Identifier};
 use snarkvm_synthesizer::program::Program;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use itertools::Itertools;
 use serde_yaml::{Mapping, Sequence, Value};
 use std::{
@@ -141,8 +141,8 @@ impl ExpectedTest for ProgramTest {
         if !self.rewrite {
             // Check that the errors match.
             let expected_errors =
-                self.expected.get(&Value::String("errors".to_string())).unwrap().as_sequence().unwrap();
-            let actual_errors = output.get(&Value::String("errors".to_string())).unwrap().as_sequence().unwrap();
+                self.expected.get(Value::String("errors".to_string())).unwrap().as_sequence().unwrap();
+            let actual_errors = output.get(Value::String("errors".to_string())).unwrap().as_sequence().unwrap();
             expected_errors.iter().zip_eq(actual_errors.iter()).for_each(|(expected, actual)| {
                 if expected != actual {
                     let expected =
@@ -153,8 +153,8 @@ impl ExpectedTest for ProgramTest {
             });
             // Check that the outputs match.
             let expected_outputs =
-                self.expected.get(&Value::String("outputs".to_string())).unwrap().as_sequence().unwrap();
-            let actual_outputs = output.get(&Value::String("outputs".to_string())).unwrap().as_sequence().unwrap();
+                self.expected.get(Value::String("outputs".to_string())).unwrap().as_sequence().unwrap();
+            let actual_outputs = output.get(Value::String("outputs".to_string())).unwrap().as_sequence().unwrap();
             self.cases.iter().zip_eq(expected_outputs.iter().zip_eq(actual_outputs.iter())).for_each(
                 |(test, (expected, actual))| {
                     if expected != actual {

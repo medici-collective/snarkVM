@@ -19,10 +19,10 @@ use snarkvm_circuit_types::environment::assert_scope;
 mod to_tpk;
 mod verify;
 
-use crate::{compute_function_id, Identifier, Plaintext, ProgramID, Record, Value};
+use crate::{Identifier, Plaintext, ProgramID, Record, Value, compute_function_id};
 use snarkvm_circuit_account::Signature;
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Address, Boolean, Field, Group, U16};
+use snarkvm_circuit_types::{Address, Boolean, Field, Group, U16, environment::prelude::*};
 
 pub enum InputID<A: Aleo> {
     /// The hash of the constant input.
@@ -37,7 +37,7 @@ pub enum InputID<A: Aleo> {
     ExternalRecord(Field<A>),
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for InputID<A> {
     type Primitive = console::InputID<A::Network>;
 
@@ -63,7 +63,7 @@ impl<A: Aleo> Inject for InputID<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for InputID<A> {
     type Primitive = console::InputID<A::Network>;
 
@@ -141,7 +141,7 @@ pub struct Request<A: Aleo> {
     scm: Field<A>,
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for Request<A> {
     type Primitive = console::Request<A::Network>;
 
@@ -286,7 +286,7 @@ impl<A: Aleo> Request<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for Request<A> {
     type Primitive = console::Request<A::Network>;
 

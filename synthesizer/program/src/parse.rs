@@ -45,58 +45,70 @@ impl<N: Network, Instruction: InstructionTrait<N>, Command: CommandTrait<N>> Par
         // Parse the semicolon ';' keyword from the string.
         let (string, _) = tag(";")(string)?;
 
+        fn intermediate<N: Network, Instruction: InstructionTrait<N>, Command: CommandTrait<N>>(
+            string: &str,
+        ) -> ParserResult<P<N, Instruction, Command>> {
+            // Parse the whitespace and comments from the string.
+            let (string, _) = Sanitizer::parse(string)?;
+
+            if string.starts_with(Mapping::<N>::type_name()) {
+                map(Mapping::parse, |mapping| P::<N, Instruction, Command>::M(mapping))(string)
+            } else if string.starts_with(StructType::<N>::type_name()) {
+                map(StructType::parse, |struct_| P::<N, Instruction, Command>::I(struct_))(string)
+            } else if string.starts_with(RecordType::<N>::type_name()) {
+                map(RecordType::parse, |record| P::<N, Instruction, Command>::R(record))(string)
+            } else if string.starts_with(ClosureCore::<N, Instruction>::type_name()) {
+                map(ClosureCore::parse, |closure| P::<N, Instruction, Command>::C(closure))(string)
+            } else if string.starts_with(FunctionCore::<N, Instruction, Command>::type_name()) {
+                map(FunctionCore::parse, |function| P::<N, Instruction, Command>::F(function))(string)
+            } else {
+                Err(Err::Error(make_error(string, ErrorKind::Alt)))
+            }
+        }
+
         // Parse the struct or function from the string.
-        let (string, components) = many1(alt((
-            map(Mapping::parse, |mapping| P::<N, Instruction, Command>::M(mapping)),
-            map(StructType::parse, |struct_| P::<N, Instruction, Command>::I(struct_)),
-            map(RecordType::parse, |record| P::<N, Instruction, Command>::R(record)),
-            map(ClosureCore::parse, |closure| P::<N, Instruction, Command>::C(closure)),
-            map(FunctionCore::parse, |function| P::<N, Instruction, Command>::F(function)),
-        )))(string)?;
+        let (string, components) = many1(intermediate)(string)?;
         // Parse the whitespace and comments from the string.
         let (string, _) = Sanitizer::parse(string)?;
 
-        // Return the program.
-        map_res(take(0usize), move |_| {
-            // Initialize a new program.
-            let mut program = match ProgramCore::<N, Instruction, Command>::new(id) {
-                Ok(program) => program,
+        // Initialize a new program.
+        let mut program = match ProgramCore::<N, Instruction, Command>::new(id) {
+            Ok(program) => program,
+            Err(error) => {
+                eprintln!("{error}");
+                return map_res(take(0usize), Err)(string);
+            }
+        };
+        // Construct the program with the parsed components.
+        for component in components {
+            let result = match component {
+                P::M(mapping) => program.add_mapping(mapping),
+                P::I(struct_) => program.add_struct(struct_),
+                P::R(record) => program.add_record(record),
+                P::C(closure) => program.add_closure(closure),
+                P::F(function) => program.add_function(function),
+            };
+
+            match result {
+                Ok(_) => (),
                 Err(error) => {
                     eprintln!("{error}");
-                    return Err(error);
+                    return map_res(take(0usize), Err)(string);
                 }
-            };
-            // Construct the program with the parsed components.
-            for component in components.iter() {
-                let result = match component {
-                    P::M(mapping) => program.add_mapping(mapping.clone()),
-                    P::I(struct_) => program.add_struct(struct_.clone()),
-                    P::R(record) => program.add_record(record.clone()),
-                    P::C(closure) => program.add_closure(closure.clone()),
-                    P::F(function) => program.add_function(function.clone()),
-                };
+            }
+        }
+        // Lastly, add the imports (if any) to the program.
+        for import in imports {
+            match program.add_import(import) {
+                Ok(_) => (),
+                Err(error) => {
+                    eprintln!("{error}");
+                    return map_res(take(0usize), Err)(string);
+                }
+            }
+        }
 
-                match result {
-                    Ok(_) => (),
-                    Err(error) => {
-                        eprintln!("{error}");
-                        return Err(error);
-                    }
-                }
-            }
-            // Lastly, add the imports (if any) to the program.
-            for import in imports.iter() {
-                match program.add_import(import.clone()) {
-                    Ok(_) => (),
-                    Err(error) => {
-                        eprintln!("{error}");
-                        return Err(error);
-                    }
-                }
-            }
-            // Output the program.
-            Ok::<_, Error>(program)
-        })(string)
+        Ok((string, program))
     }
 }
 
@@ -131,56 +143,55 @@ impl<N: Network, Instruction: InstructionTrait<N>, Command: CommandTrait<N>> Deb
     }
 }
 
-#[allow(clippy::format_push_string)]
 impl<N: Network, Instruction: InstructionTrait<N>, Command: CommandTrait<N>> Display
     for ProgramCore<N, Instruction, Command>
 {
     /// Prints the program as a string.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // Initialize a string for the program.
-        let mut program = String::new();
-
         if !self.imports.is_empty() {
             // Print the imports.
             for import in self.imports.values() {
-                program.push_str(&format!("{import}\n"));
+                writeln!(f, "{import}")?;
             }
 
             // Print a newline.
-            program.push('\n');
+            writeln!(f)?;
         }
 
         // Print the program name.
-        program += &format!("{} {};\n\n", Self::type_name(), self.id);
+        write!(f, "{} {};\n\n", Self::type_name(), self.id)?;
 
-        for (identifier, definition) in self.identifiers.iter() {
+        let mut identifier_iter = self.identifiers.iter().peekable();
+        while let Some((identifier, definition)) = identifier_iter.next() {
             match definition {
                 ProgramDefinition::Mapping => match self.mappings.get(identifier) {
-                    Some(mapping) => program.push_str(&format!("{mapping}\n\n")),
+                    Some(mapping) => writeln!(f, "{mapping}")?,
                     None => return Err(fmt::Error),
                 },
                 ProgramDefinition::Struct => match self.structs.get(identifier) {
-                    Some(struct_) => program.push_str(&format!("{struct_}\n\n")),
+                    Some(struct_) => writeln!(f, "{struct_}")?,
                     None => return Err(fmt::Error),
                 },
                 ProgramDefinition::Record => match self.records.get(identifier) {
-                    Some(record) => program.push_str(&format!("{record}\n\n")),
+                    Some(record) => writeln!(f, "{record}")?,
                     None => return Err(fmt::Error),
                 },
                 ProgramDefinition::Closure => match self.closures.get(identifier) {
-                    Some(closure) => program.push_str(&format!("{closure}\n\n")),
+                    Some(closure) => writeln!(f, "{closure}")?,
                     None => return Err(fmt::Error),
                 },
                 ProgramDefinition::Function => match self.functions.get(identifier) {
-                    Some(function) => program.push_str(&format!("{function}\n\n")),
+                    Some(function) => writeln!(f, "{function}")?,
                     None => return Err(fmt::Error),
                 },
             }
+            // Omit the last newline.
+            if identifier_iter.peek().is_some() {
+                writeln!(f)?;
+            }
         }
-        // Remove the last newline.
-        program.pop();
 
-        write!(f, "{program}")
+        Ok(())
     }
 }
 

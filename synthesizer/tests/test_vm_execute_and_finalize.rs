@@ -18,7 +18,7 @@ mod utilities;
 use console::{
     account::{PrivateKey, ViewKey},
     network::prelude::*,
-    program::{Entry, Identifier, Literal, Plaintext, ProgramID, Record, Value, U64},
+    program::{Entry, Identifier, Literal, Plaintext, ProgramID, Record, U64, Value},
     types::{Boolean, Field},
 };
 use ledger_block::{
@@ -31,15 +31,14 @@ use ledger_block::{
     Transactions,
     Transition,
 };
-use ledger_store::{helpers::memory::ConsensusMemory, ConsensusStorage, ConsensusStore};
-use snarkvm_synthesizer::{program::FinalizeOperation, VM};
+use ledger_store::{ConsensusStorage, ConsensusStore, helpers::memory::ConsensusMemory};
+use snarkvm_synthesizer::{VM, program::FinalizeOperation};
 use synthesizer_program::FinalizeGlobalState;
 
 use anyhow::Result;
 use console::account::Address;
 use indexmap::IndexMap;
 use rayon::prelude::*;
-use std::borrow::Borrow;
 use utilities::*;
 
 #[test]
@@ -91,9 +90,11 @@ fn run_test(test: &ProgramTest) -> serde_yaml::Mapping {
                 rng,
             )
             .unwrap();
+        let time_since_last_block = CurrentNetwork::BLOCK_TIME as i64;
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = vm
             .speculate(
                 construct_finalize_global_state(&vm),
+                time_since_last_block,
                 Some(0u64),
                 vec![],
                 &None.into(),
@@ -105,6 +106,7 @@ fn run_test(test: &ProgramTest) -> serde_yaml::Mapping {
 
         let block = construct_next_block(
             &vm,
+            time_since_last_block,
             &genesis_private_key,
             ratifications,
             transactions,
@@ -135,9 +137,11 @@ fn run_test(test: &ProgramTest) -> serde_yaml::Mapping {
             }
         };
 
+        let time_since_last_block = CurrentNetwork::BLOCK_TIME as i64;
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = vm
             .speculate(
                 construct_finalize_global_state(&vm),
+                time_since_last_block,
                 Some(0u64),
                 vec![],
                 &None.into(),
@@ -149,6 +153,7 @@ fn run_test(test: &ProgramTest) -> serde_yaml::Mapping {
 
         let block = construct_next_block(
             &vm,
+            time_since_last_block,
             &genesis_private_key,
             ratifications,
             transactions,
@@ -281,9 +286,11 @@ fn run_test(test: &ProgramTest) -> serde_yaml::Mapping {
             );
 
             // Speculate on the ratifications, solutions, and transaction.
+            let time_since_last_block = CurrentNetwork::BLOCK_TIME as i64;
             let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = match vm
                 .speculate(
                     construct_finalize_global_state(&vm),
+                    time_since_last_block,
                     Some(0u64),
                     vec![],
                     &None.into(),
@@ -319,6 +326,7 @@ fn run_test(test: &ProgramTest) -> serde_yaml::Mapping {
             // Construct the next block.
             let block = construct_next_block(
                 &vm,
+                time_since_last_block,
                 &private_key,
                 ratifications,
                 transactions,
@@ -423,14 +431,24 @@ fn construct_fee_records<C: ConsensusStorage<CurrentNetwork>, R: Rng + CryptoRng
             }
         }
 
+        let time_since_last_block = CurrentNetwork::BLOCK_TIME as i64;
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = vm
-            .speculate(construct_finalize_global_state(vm), Some(0u64), vec![], &None.into(), transactions.iter(), rng)
+            .speculate(
+                construct_finalize_global_state(vm),
+                time_since_last_block,
+                Some(0u64),
+                vec![],
+                &None.into(),
+                transactions.iter(),
+                rng,
+            )
             .unwrap();
         assert!(aborted_transaction_ids.is_empty());
 
         // Create a block for the fee transactions and add them to the VM.
         let block = construct_next_block(
             vm,
+            time_since_last_block,
             private_key,
             ratifications,
             transactions,
@@ -448,8 +466,10 @@ fn construct_fee_records<C: ConsensusStorage<CurrentNetwork>, R: Rng + CryptoRng
 }
 
 // A helper function to construct the next block.
+#[allow(clippy::too_many_arguments)]
 fn construct_next_block<C: ConsensusStorage<CurrentNetwork>, R: Rng + CryptoRng>(
     vm: &VM<CurrentNetwork, C>,
+    time_since_last_block: i64,
     private_key: &PrivateKey<CurrentNetwork>,
     ratifications: Ratifications<CurrentNetwork>,
     transactions: Transactions<CurrentNetwork>,
@@ -458,8 +478,7 @@ fn construct_next_block<C: ConsensusStorage<CurrentNetwork>, R: Rng + CryptoRng>
     rng: &mut R,
 ) -> Result<Block<CurrentNetwork>> {
     // Get the most recent block.
-    let block_hash =
-        vm.block_store().get_block_hash(*vm.block_store().heights().max().unwrap().borrow()).unwrap().unwrap();
+    let block_hash = vm.block_store().get_block_hash(vm.block_store().max_height().unwrap()).unwrap().unwrap();
     let previous_block = vm.block_store().get_block(&block_hash).unwrap().unwrap();
 
     // Construct the metadata associated with the block.
@@ -473,7 +492,7 @@ fn construct_next_block<C: ConsensusStorage<CurrentNetwork>, R: Rng + CryptoRng>
         CurrentNetwork::GENESIS_PROOF_TARGET,
         previous_block.last_coinbase_target(),
         previous_block.last_coinbase_timestamp(),
-        CurrentNetwork::GENESIS_TIMESTAMP + 1,
+        previous_block.timestamp().saturating_add(time_since_last_block),
     )?;
     // Construct the block header.
     let header = Header::from(
@@ -524,7 +543,7 @@ fn construct_finalize_global_state<C: ConsensusStorage<CurrentNetwork>>(
     vm: &VM<CurrentNetwork, C>,
 ) -> FinalizeGlobalState {
     // Retrieve the latest block.
-    let block_height = *vm.block_store().heights().max().unwrap().clone();
+    let block_height = vm.block_store().max_height().unwrap();
     let latest_block_hash = vm.block_store().get_block_hash(block_height).unwrap().unwrap();
     let latest_block = vm.block_store().get_block(&latest_block_hash).unwrap().unwrap();
     // Retrieve the latest round.

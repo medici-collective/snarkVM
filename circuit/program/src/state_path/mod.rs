@@ -23,7 +23,7 @@ use snarkvm_circuit_types::environment::assert_scope;
 
 use snarkvm_circuit_collections::merkle_tree::MerklePath;
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Boolean, Field, U8};
+use snarkvm_circuit_types::{Boolean, Field, U8, environment::prelude::*};
 
 /// The depth of the Merkle tree for the blocks.
 const BLOCKS_DEPTH: u8 = console::BLOCKS_DEPTH;
@@ -153,7 +153,7 @@ impl<A: Aleo> Eject for StatePath<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
     use crate::Circuit;

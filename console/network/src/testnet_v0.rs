@@ -16,22 +16,22 @@
 use super::*;
 use crate::TRANSACTION_PREFIX;
 use snarkvm_console_algorithms::{
+    BHP256,
+    BHP512,
+    BHP768,
+    BHP1024,
     Blake2Xs,
     Keccak256,
     Keccak384,
     Keccak512,
-    Pedersen128,
     Pedersen64,
+    Pedersen128,
     Poseidon2,
     Poseidon4,
     Poseidon8,
     Sha3_256,
     Sha3_384,
     Sha3_512,
-    BHP1024,
-    BHP256,
-    BHP512,
-    BHP768,
 };
 
 lazy_static! {
@@ -133,12 +133,25 @@ impl Network for TestnetV0 {
     /// The transmission checksum type.
     type TransmissionChecksum = u128;
 
+    /// The block height from which consensus V2 rules apply.
+    #[cfg(not(any(test, feature = "test")))]
+    const CONSENSUS_V2_HEIGHT: u32 = 2_950_000;
+    // TODO (raychu86): Update this value based on the desired testnet height.
+    /// The block height from which consensus V2 rules apply.
+    #[cfg(any(test, feature = "test"))]
+    const CONSENSUS_V2_HEIGHT: u32 = 10;
     /// The network edition.
     const EDITION: u16 = 0;
     /// The genesis block coinbase target.
+    #[cfg(not(feature = "test_targets"))]
     const GENESIS_COINBASE_TARGET: u64 = (1u64 << 29).saturating_sub(1);
+    #[cfg(feature = "test_targets")]
+    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 5).saturating_sub(1);
     /// The genesis block proof target.
+    #[cfg(not(feature = "test_targets"))]
     const GENESIS_PROOF_TARGET: u64 = 1u64 << 27;
+    #[cfg(feature = "test_targets")]
+    const GENESIS_PROOF_TARGET: u64 = 1u64 << 3;
     /// The fixed timestamp of the genesis block.
     const GENESIS_TIMESTAMP: i64 = 1715776496 /* 2024-05-15 12:34:56 UTC */;
     /// The network ID.

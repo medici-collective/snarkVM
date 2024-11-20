@@ -388,9 +388,12 @@ impl<N: Network> Block<N> {
         )?;
 
         // Calculate the expected coinbase reward.
-        let expected_coinbase_reward = coinbase_reward(
+        let expected_coinbase_reward = coinbase_reward::<N>(
             height,
+            timestamp,
+            N::GENESIS_TIMESTAMP,
             N::STARTING_SUPPLY,
+            N::ANCHOR_TIME,
             N::ANCHOR_HEIGHT,
             N::BLOCK_TIME,
             combined_proof_target,
@@ -402,9 +405,17 @@ impl<N: Network> Block<N> {
         let expected_transaction_fees =
             self.transactions.iter().map(|tx| Ok(*tx.priority_fee_amount()?)).sum::<Result<u64>>()?;
 
+        // Calculate the time since last block.
+        let time_since_last_block = timestamp.saturating_sub(previous_block.timestamp());
         // Compute the expected block reward.
-        let expected_block_reward =
-            block_reward(N::STARTING_SUPPLY, N::BLOCK_TIME, expected_coinbase_reward, expected_transaction_fees);
+        let expected_block_reward = block_reward::<N>(
+            height,
+            N::STARTING_SUPPLY,
+            N::BLOCK_TIME,
+            time_since_last_block,
+            expected_coinbase_reward,
+            expected_transaction_fees,
+        );
         // Compute the expected puzzle reward.
         let expected_puzzle_reward = puzzle_reward(expected_coinbase_reward);
 

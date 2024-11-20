@@ -25,7 +25,7 @@ use snarkvm_circuit_types::environment::{assert_count, assert_output_mode, asser
 
 use crate::PrivateKey;
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Address, Boolean, Field, Group, Scalar};
+use snarkvm_circuit_types::{Address, Boolean, Field, Group, Scalar, environment::prelude::*};
 
 #[derive(Clone)]
 pub struct ComputeKey<A: Aleo> {
@@ -37,7 +37,7 @@ pub struct ComputeKey<A: Aleo> {
     sk_prf: Scalar<A>,
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for ComputeKey<A> {
     type Primitive = console::ComputeKey<A::Network>;
 
@@ -69,7 +69,7 @@ impl<A: Aleo> ComputeKey<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for ComputeKey<A> {
     type Primitive = console::ComputeKey<A::Network>;
 
@@ -87,10 +87,10 @@ impl<A: Aleo> Eject for ComputeKey<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 pub(crate) mod tests {
     use super::*;
-    use crate::{helpers::generate_account, Circuit};
+    use crate::{Circuit, helpers::generate_account};
 
     use anyhow::Result;
 

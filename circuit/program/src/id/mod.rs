@@ -22,7 +22,7 @@ mod to_fields;
 
 use crate::Identifier;
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Address, Boolean, Field};
+use snarkvm_circuit_types::{Address, Boolean, Field, environment::prelude::*};
 
 /// A program ID is of the form `{name}.{network}`.
 /// If no `network`-level domain is specified, the default network is used.
@@ -34,7 +34,7 @@ pub struct ProgramID<A: Aleo> {
     network: Identifier<A>,
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for ProgramID<A> {
     type Primitive = console::ProgramID<A::Network>;
 
@@ -61,7 +61,7 @@ impl<A: Aleo> ProgramID<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for ProgramID<A> {
     type Primitive = console::ProgramID<A::Network>;
 

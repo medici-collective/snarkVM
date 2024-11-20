@@ -15,7 +15,7 @@
 
 use console::{
     network::Network,
-    prelude::{de, Deserialize, Deserializer, EnumAccess, One, Result, Serialize, Serializer, VariantAccess, Visitor},
+    prelude::{Deserialize, Deserializer, EnumAccess, One, Result, Serialize, Serializer, VariantAccess, Visitor, de},
     types::Field,
 };
 
@@ -162,7 +162,7 @@ impl<'de> Deserialize<'de> for BlockRange {
                         Ok(BlockRange::RangeInclusive(RangeInclusive::new(start, end)))
                     }
                     Field::FullRange => {
-                        variant.newtype_variant()?;
+                        variant.unit_variant()?;
                         Ok(BlockRange::FullRange)
                     }
                 }

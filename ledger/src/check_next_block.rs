@@ -70,8 +70,15 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         )?;
 
         // Ensure speculation over the unconfirmed transactions is correct and ensure each transaction is well-formed and unique.
-        let ratified_finalize_operations =
-            self.vm.check_speculate(state, block.ratifications(), block.solutions(), block.transactions(), rng)?;
+        let time_since_last_block = block.timestamp().saturating_sub(self.latest_timestamp());
+        let ratified_finalize_operations = self.vm.check_speculate(
+            state,
+            time_since_last_block,
+            block.ratifications(),
+            block.solutions(),
+            block.transactions(),
+            rng,
+        )?;
 
         // Retrieve the committee lookback.
         let committee_lookback = {

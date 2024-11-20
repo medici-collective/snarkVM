@@ -1,6 +1,6 @@
 [package]
 name = "snarkvm-ledger-narwhal-data"
-version = "0.16.19"
+version = "1.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A batch certificate for a Narwhal-style memory pool in a decentralized virtual machine"
 homepage = "https://aleo.org"
@@ -29,7 +29,7 @@ async = [ "tokio" ]
 [dependencies.console]
 package = "snarkvm-console"
 path = "../../../console"
-version = "=0.16.19"
+version = "=1.0.0"
 
 [dependencies.bytes]
 version = "1"
@@ -42,3 +42,11 @@ features = [ "preserve_order" ]
 optional = true
 version = "1"
 features = [ "rt" ]
+
+[dev-dependencies.ledger-block]
+package = "snarkvm-ledger-block"
+path = "../../../ledger/block"
+
+[dev-dependencies.ledger-test-helpers]
+package = "snarkvm-ledger-test-helpers"
+path = "../../../ledger/test-helpers"

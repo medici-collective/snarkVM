@@ -36,17 +36,17 @@ mod testnet_v0;
 pub use testnet_v0::*;
 
 pub mod prelude {
-    pub use crate::{environment::prelude::*, Network};
+    pub use crate::{Network, environment::prelude::*};
 }
 
 use crate::environment::prelude::*;
 use snarkvm_algorithms::{
+    AlgebraicSponge,
     crypto_hash::PoseidonSponge,
     snark::varuna::{CircuitProvingKey, CircuitVerifyingKey, VarunaHidingMode},
     srs::{UniversalProver, UniversalVerifier},
-    AlgebraicSponge,
 };
-use snarkvm_console_algorithms::{Poseidon2, Poseidon4, BHP1024, BHP512};
+use snarkvm_console_algorithms::{BHP512, BHP1024, Poseidon2, Poseidon4};
 use snarkvm_console_collections::merkle_tree::{MerklePath, MerkleTree};
 use snarkvm_console_types::{Field, Group, Scalar};
 use snarkvm_curves::PairingEngine;
@@ -91,25 +91,18 @@ pub trait Network:
     /// The network edition.
     const EDITION: u16;
 
+    /// The block height from which consensus V2 rules apply.
+    const CONSENSUS_V2_HEIGHT: u32;
+
     /// The function name for the inclusion circuit.
     const INCLUSION_FUNCTION_NAME: &'static str;
 
     /// The fixed timestamp of the genesis block.
     const GENESIS_TIMESTAMP: i64;
     /// The genesis block coinbase target.
-    #[cfg(not(feature = "test"))]
-    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 29).saturating_sub(1);
-    /// The genesis block coinbase target.
-    /// This is deliberately set to a low value (32) for testing purposes only.
-    #[cfg(feature = "test")]
-    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 5).saturating_sub(1);
+    const GENESIS_COINBASE_TARGET: u64;
     /// The genesis block proof target.
-    #[cfg(not(feature = "test"))]
-    const GENESIS_PROOF_TARGET: u64 = 1u64 << 27;
-    /// The genesis block proof target.
-    /// This is deliberately set to a low value (8) for testing purposes only.
-    #[cfg(feature = "test")]
-    const GENESIS_PROOF_TARGET: u64 = 1u64 << 3;
+    const GENESIS_PROOF_TARGET: u64;
     /// The maximum number of solutions that can be included per block as a power of 2.
     const MAX_SOLUTIONS_AS_POWER_OF_TWO: u8 = 2; // 4 solutions
     /// The maximum number of solutions that can be included per block.
@@ -201,6 +194,19 @@ pub trait Network:
 
     /// The maximum number of certificates in a batch.
     const MAX_CERTIFICATES: u16;
+    /// The maximum number of transmissions per batch.
+    /// Note: This limit is set to 50 as part of safety measures to prevent DoS attacks.
+    /// This limit can be increased in the future as performance improves. Alternatively,
+    /// the rate of block production can be sped up to compensate for the limit set here.
+    const MAX_TRANSMISSIONS_PER_BATCH: u16 = 50;
+
+    /// The maximum number of stacks in the process
+    /// Allows for fast processing for blocks made from 4 maximally full rounds.
+    #[cfg(not(feature = "test"))]
+    const MAX_STACKS: usize = Self::MAX_TRANSMISSIONS_PER_BATCH as usize * Self::MAX_CERTIFICATES as usize * 4;
+    /// The maximum number of stacks in the process.
+    #[cfg(feature = "test")]
+    const MAX_STACKS: usize = 64;
 
     /// The maximum number of bytes in a transaction.
     // Note: This value must **not** be decreased as it would invalidate existing transactions.

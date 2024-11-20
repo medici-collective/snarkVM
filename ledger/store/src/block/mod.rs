@@ -17,14 +17,14 @@ pub mod confirmed_tx_type;
 pub use confirmed_tx_type::*;
 
 use crate::{
-    atomic_batch_scope,
-    cow_to_cloned,
-    cow_to_copied,
-    helpers::{Map, MapRead},
     TransactionStorage,
     TransactionStore,
     TransitionStorage,
     TransitionStore,
+    atomic_batch_scope,
+    cow_to_cloned,
+    cow_to_copied,
+    helpers::{Map, MapRead},
 };
 use console::{
     network::prelude::*,
@@ -488,16 +488,10 @@ pub trait BlockStorage<N: Network>: 'static + Clone + Send + Sync {
         };
 
         // Retrieve the aborted solution IDs.
-        let aborted_solution_ids = match self.get_block_aborted_solution_ids(block_hash)? {
-            Some(solution_ids) => solution_ids,
-            None => Vec::new(),
-        };
+        let aborted_solution_ids = (self.get_block_aborted_solution_ids(block_hash)?).unwrap_or_default();
 
         // Retrieve the aborted transaction IDs.
-        let aborted_transaction_ids = match self.get_block_aborted_transaction_ids(block_hash)? {
-            Some(transaction_ids) => transaction_ids,
-            None => Vec::new(),
-        };
+        let aborted_transaction_ids = (self.get_block_aborted_transaction_ids(block_hash)?).unwrap_or_default();
 
         // Retrieve the rejected transaction IDs, and the deployment or execution ID.
         let rejected_transaction_ids_and_deployment_or_execution_id = match self.get_block_transactions(block_hash)? {
@@ -1015,18 +1009,13 @@ impl<N: Network, B: BlockStorage<N>> BlockStore<N, B> {
 
         // Compute the block tree.
         let tree = {
-            // Prepare an iterator over the block heights.
-            let heights = storage.id_map().keys_confirmed();
-            // Prepare the leaves of the block tree.
-            let hashes = match heights.max() {
-                Some(height) => cfg_into_iter!(0..=cow_to_copied!(height))
-                    .map(|height| match storage.get_block_hash(height)? {
-                        Some(hash) => Ok(hash.to_bits_le()),
-                        None => bail!("Missing block hash for block {height}"),
-                    })
-                    .collect::<Result<Vec<Vec<bool>>>>()?,
-                None => vec![],
-            };
+            // Prepare an iterator over the block heights and prepare the leaves of the block tree.
+            let hashes = storage
+                .id_map()
+                .iter_confirmed()
+                .sorted_unstable_by(|(h1, _), (h2, _)| h1.cmp(h2))
+                .map(|(_, hash)| hash.to_bits_le())
+                .collect::<Vec<Vec<bool>>>();
             // Construct the block tree.
             Arc::new(RwLock::new(N::merkle_tree_bhp(&hashes)?))
         };
@@ -1076,10 +1065,8 @@ impl<N: Network, B: BlockStorage<N>> BlockStore<N, B> {
         let mut tree = self.tree.write();
 
         // Determine the block heights to remove.
-        let heights = match self.storage.id_map().keys_confirmed().max() {
-            Some(height) => {
-                // Determine the end block height to remove.
-                let end_height = cow_to_copied!(height);
+        let heights = match self.max_height() {
+            Some(end_height) => {
                 // Determine the start block height to remove.
                 let start_height = end_height
                     .checked_sub(n - 1)
@@ -1359,6 +1346,11 @@ impl<N: Network, B: BlockStorage<N>> BlockStore<N, B> {
     /// Returns an iterator over the block heights, for all blocks in `self`.
     pub fn heights(&self) -> impl '_ + Iterator<Item = Cow<'_, u32>> {
         self.storage.id_map().keys_confirmed()
+    }
+
+    /// Returns the height of the latest block in the storage.
+    pub fn max_height(&self) -> Option<u32> {
+        self.storage.id_map().len_confirmed().checked_sub(1)?.try_into().ok()
     }
 
     /// Returns an iterator over the block hashes, for all blocks in `self`.

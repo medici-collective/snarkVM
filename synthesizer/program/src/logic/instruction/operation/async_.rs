@@ -14,13 +14,13 @@
 // limitations under the License.
 
 use crate::{
-    traits::{RegistersLoad, StackMatches, StackProgram},
     Opcode,
     Operand,
     RegistersLoadCircuit,
     RegistersStore,
     RegistersStoreCircuit,
     Result,
+    traits::{RegistersLoad, StackMatches, StackProgram},
 };
 
 use circuit::{Inject, Mode};
@@ -391,7 +391,7 @@ mod tests {
     //     let operands = vec![operand_a, operand_b];
     //
     //     // Initialize the stack.
-    //     let stack = Stack::new(&Process::load()?, &program)?;
+    //     let stack = Stack::new(&Process::load_testing_only()?, &program)?;
     //
     //     Ok((stack, operands))
     // }

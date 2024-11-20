@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use super::*;
-use snarkvm_circuit_algorithms::{Hash, Keccak, Poseidon, BHP};
+use snarkvm_circuit_algorithms::{BHP, Hash, Keccak, Poseidon};
 
 /// A trait for a Merkle leaf hash function.
 pub trait LeafHash {
@@ -74,10 +74,10 @@ impl<E: Environment, const TYPE: u8, const VARIANT: usize> LeafHash for Keccak<E
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
-    use snarkvm_circuit_algorithms::{Keccak256, Poseidon4, Sha3_256, BHP1024};
+    use snarkvm_circuit_algorithms::{BHP1024, Keccak256, Poseidon4, Sha3_256};
     use snarkvm_circuit_types::environment::Circuit;
     use snarkvm_utilities::{TestRng, Uniform};
 

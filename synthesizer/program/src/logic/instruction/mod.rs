@@ -39,13 +39,6 @@ use crate::traits::{
 use console::{
     network::Network,
     prelude::{
-        alt,
-        bail,
-        ensure,
-        error,
-        fmt,
-        map,
-        tag,
         Debug,
         Display,
         Error,
@@ -60,6 +53,13 @@ use console::{
         Sanitizer,
         ToBytes,
         Write,
+        alt,
+        bail,
+        ensure,
+        error,
+        fmt,
+        map,
+        tag,
     },
     program::{Register, RegisterType},
 };
@@ -469,6 +469,7 @@ mod tests {
     #[test]
     fn test_opcodes() {
         // Sanity check the number of instructions is unchanged.
+        // Note that the number of opcodes **MUST NOT** exceed u16::MAX.
         assert_eq!(
             68,
             Instruction::<CurrentNetwork>::OPCODES.len(),

@@ -25,10 +25,10 @@ impl<A: Aleo> ComputeKey<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
-    use crate::{helpers::generate_account, Circuit};
+    use crate::{Circuit, helpers::generate_account};
 
     use anyhow::Result;
 
@@ -48,7 +48,7 @@ mod tests {
             // Initialize the compute key.
             let candidate = ComputeKey::<Circuit>::new(mode, compute_key);
 
-            Circuit::scope(&format!("{mode} {i}"), || {
+            Circuit::scope(format!("{mode} {i}"), || {
                 let candidate = candidate.to_address();
                 assert_eq!(*address, candidate.to_group().eject_value());
                 // TODO (howardwu): Resolve skipping the cost count checks for the burn-in round.

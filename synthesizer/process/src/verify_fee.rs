@@ -165,7 +165,7 @@ impl<N: Network> Process<N> {
         }
         lap!(timer, "Verify the inputs");
 
-        // Ensure there are is one output.
+        // Ensure there is one output.
         ensure!(
             fee.outputs().len() == 1,
             "The number of outputs in the fee transition should be 1, found {}",
@@ -232,7 +232,7 @@ mod tests {
         ];
 
         // Construct a new process.
-        let process = Process::load().unwrap();
+        let process = Process::load_testing_only().unwrap();
 
         for transaction in transactions {
             match transaction {

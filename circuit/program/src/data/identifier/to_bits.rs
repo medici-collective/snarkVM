@@ -47,10 +47,10 @@ impl<A: Aleo> ToBits for &Identifier<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
-    use crate::{data::identifier::tests::sample_console_identifier, Circuit};
+    use crate::{Circuit, data::identifier::tests::sample_console_identifier};
 
     use anyhow::Result;
 

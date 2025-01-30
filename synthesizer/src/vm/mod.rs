@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -21,7 +22,7 @@ mod execute;
 mod finalize;
 mod verify;
 
-use crate::{cast_mut_ref, cast_ref, convert, process, Restrictions};
+use crate::{Restrictions, cast_mut_ref, cast_ref, convert, process};
 use console::{
     account::{Address, PrivateKey},
     network::prelude::*,
@@ -46,9 +47,8 @@ use ledger_block::{
 use ledger_committee::Committee;
 use ledger_narwhal_data::Data;
 use ledger_puzzle::Puzzle;
-use ledger_query::Query;
+use ledger_query::{Query, QueryTrait};
 use ledger_store::{
-    atomic_finalize,
     BlockStore,
     ConsensusStorage,
     ConsensusStore,
@@ -57,8 +57,9 @@ use ledger_store::{
     TransactionStorage,
     TransactionStore,
     TransitionStore,
+    atomic_finalize,
 };
-use synthesizer_process::{deployment_cost, execution_cost, Authorization, Process, Trace};
+use synthesizer_process::{Authorization, Process, Trace, deployment_cost, execution_cost_v1, execution_cost_v2};
 use synthesizer_program::{FinalizeGlobalState, FinalizeOperation, FinalizeStoreTrait, Program};
 use utilities::try_vm_runtime;
 
@@ -67,7 +68,7 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Either;
 use lru::LruCache;
 use parking_lot::{Mutex, RwLock};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 use std::{collections::HashSet, num::NonZeroUsize, sync::Arc};
 
 #[cfg(not(feature = "serial"))]
@@ -360,7 +361,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
         let state = FinalizeGlobalState::new_genesis::<N>()?;
         // Speculate on the ratifications, solutions, and transactions.
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) =
-            self.speculate(state, None, ratifications, &solutions, transactions.iter(), rng)?;
+            self.speculate(state, 0, None, ratifications, &solutions, transactions.iter(), rng)?;
         ensure!(
             aborted_transaction_ids.is_empty(),
             "Failed to initialize a genesis block - found aborted transaction IDs"
@@ -442,19 +443,15 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
                     // Note: This call is guaranteed to succeed (without error), because `DISCARD_BATCH == true`.
                     self.block_store().unpause_atomic_writes::<true>()?;
                     // Rollback the Merkle tree.
-                    self.block_store().remove_last_n_from_tree_only(1).map_err(|removal_error| {
+                    self.block_store().remove_last_n_from_tree_only(1).inspect_err(|_| {
                         // Log the finalize error.
                         error!("Failed to finalize block {} - {finalize_error}", block.height());
-                        // Return the removal error.
-                        removal_error
                     })?;
                 } else {
                     // Rollback the block.
-                    self.block_store().remove_last_n(1).map_err(|removal_error| {
+                    self.block_store().remove_last_n(1).inspect_err(|_| {
                         // Log the finalize error.
                         error!("Failed to finalize block {} - {finalize_error}", block.height());
-                        // Return the removal error.
-                        removal_error
                     })?;
                 }
                 // Return the finalize error.
@@ -482,7 +479,6 @@ pub(crate) mod test_helpers {
 
     use indexmap::IndexMap;
     use once_cell::sync::OnceCell;
-    use std::borrow::Borrow;
     #[cfg(feature = "rocks")]
     use std::path::Path;
     use synthesizer_snark::VerifyingKey;
@@ -757,6 +753,36 @@ function compute:
             .clone()
     }
 
+    #[cfg(feature = "test")]
+    pub(crate) fn create_new_transaction_with_different_fee(
+        rng: &mut TestRng,
+        transaction: Transaction<CurrentNetwork>,
+        fee: u64,
+    ) -> Transaction<CurrentNetwork> {
+        // Initialize a new caller.
+        let caller_private_key = crate::vm::test_helpers::sample_genesis_private_key(rng);
+
+        // Initialize the genesis block.
+        let genesis = crate::vm::test_helpers::sample_genesis_block(rng);
+
+        // Initialize the VM.
+        let vm = sample_vm();
+        // Update the VM.
+        vm.add_next_block(&genesis).unwrap();
+
+        // Get Execution
+        let execution = transaction.execution().unwrap().clone();
+
+        // Authorize the fee.
+        let authorization =
+            vm.authorize_fee_public(&caller_private_key, fee, 100, execution.to_execution_id().unwrap(), rng).unwrap();
+        // Compute the fee.
+        let fee = vm.execute_fee_authorization(authorization, None, rng).unwrap();
+
+        // Construct the transaction.
+        Transaction::from_execution(execution, Some(fee)).unwrap()
+    }
+
     pub fn sample_next_block<R: Rng + CryptoRng>(
         vm: &VM<MainnetV0, ConsensusMemory<MainnetV0>>,
         private_key: &PrivateKey<MainnetV0>,
@@ -764,13 +790,20 @@ function compute:
         rng: &mut R,
     ) -> Result<Block<MainnetV0>> {
         // Get the most recent block.
-        let block_hash =
-            vm.block_store().get_block_hash(*vm.block_store().heights().max().unwrap().borrow()).unwrap().unwrap();
+        let block_hash = vm.block_store().get_block_hash(vm.block_store().max_height().unwrap()).unwrap().unwrap();
         let previous_block = vm.block_store().get_block(&block_hash).unwrap().unwrap();
 
         // Construct the new block header.
-        let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) =
-            vm.speculate(sample_finalize_state(1), None, vec![], &None.into(), transactions.iter(), rng)?;
+        let time_since_last_block = MainnetV0::BLOCK_TIME as i64;
+        let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = vm.speculate(
+            sample_finalize_state(1),
+            time_since_last_block,
+            None,
+            vec![],
+            &None.into(),
+            transactions.iter(),
+            rng,
+        )?;
 
         // Construct the metadata associated with the block.
         let metadata = Metadata::new(
@@ -783,7 +816,7 @@ function compute:
             MainnetV0::GENESIS_PROOF_TARGET,
             previous_block.last_coinbase_target(),
             previous_block.last_coinbase_timestamp(),
-            MainnetV0::GENESIS_TIMESTAMP + 1,
+            previous_block.timestamp().saturating_add(time_since_last_block),
         )?;
 
         let header = Header::from(
@@ -1323,6 +1356,7 @@ function call_fee_private:
     }
 
     #[test]
+    #[ignore = "memory-intensive"]
     fn test_deployment_synthesis_overload() {
         let rng = &mut TestRng::default();
 

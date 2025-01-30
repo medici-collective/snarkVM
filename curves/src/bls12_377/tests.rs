@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,15 +16,13 @@
 #![allow(unused_imports)]
 use crate::{
     bls12_377::{
-        g1::Bls12_377G1Parameters,
-        g2::Bls12_377G2Parameters,
         Bls12_377,
         Fq,
-        Fq12,
         Fq2,
         Fq2Parameters,
         Fq6,
         Fq6Parameters,
+        Fq12,
         FqParameters,
         Fr,
         FrParameters,
@@ -31,9 +30,15 @@ use crate::{
         G1Projective,
         G2Affine,
         G2Projective,
+        g1::Bls12_377G1Parameters,
+        g2::Bls12_377G2Parameters,
     },
     templates::{short_weierstrass_jacobian::tests::sw_tests, twisted_edwards_extended::tests::edwards_test},
     traits::{
+        AffineCurve,
+        PairingEngine,
+        ProjectiveCurve,
+        ShortWeierstrassParameters,
         tests_field::{
             bench_sqrt,
             field_serialization_test,
@@ -45,14 +50,9 @@ use crate::{
         },
         tests_group::*,
         tests_projective::curve_tests,
-        AffineCurve,
-        PairingEngine,
-        ProjectiveCurve,
-        ShortWeierstrassParameters,
     },
 };
 use snarkvm_fields::{
-    fp6_3over2::Fp6Parameters,
     FftField,
     FftParameters,
     Field,
@@ -63,11 +63,12 @@ use snarkvm_fields::{
     PrimeField,
     SquareRootField,
     Zero,
+    fp6_3over2::Fp6Parameters,
 };
 use snarkvm_utilities::{
+    BitIteratorBE,
     biginteger::{BigInteger, BigInteger256, BigInteger384},
     rand::{TestRng, Uniform},
-    BitIteratorBE,
 };
 
 use rand::Rng;

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,7 +15,7 @@
 
 use crate::Vec;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 
 /// Takes as input a sequence of objects, and converts them to a series of little-endian bits.
 /// All traits that implement `ToBits` can be automatically converted to bits in this manner.
@@ -318,7 +319,7 @@ mod tests {
     use crate::{TestRng, Uniform};
 
     use anyhow::Result;
-    use rand::{distributions::Alphanumeric, Rng};
+    use rand::{Rng, distributions::Alphanumeric};
 
     const ITERATIONS: u64 = 10000;
 

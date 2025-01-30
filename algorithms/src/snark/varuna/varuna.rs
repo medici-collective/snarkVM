@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,6 +15,9 @@
 
 use super::Certificate;
 use crate::{
+    AlgebraicSponge,
+    SNARK,
+    SNARKError,
     fft::EvaluationDomain,
     polycommit::sonic_pc::{
         Commitment,
@@ -26,34 +30,30 @@ use crate::{
     },
     r1cs::{ConstraintSynthesizer, SynthesisError},
     snark::varuna::{
-        ahp::{AHPError, AHPForR1CS, CircuitId, EvaluationsProvider},
-        proof,
-        prover,
-        witness_label,
         CircuitProvingKey,
         CircuitVerifyingKey,
         Proof,
         SNARKMode,
         UniversalSRS,
+        ahp::{AHPError, AHPForR1CS, CircuitId, EvaluationsProvider},
+        proof,
+        prover,
+        witness_label,
     },
     srs::UniversalVerifier,
-    AlgebraicSponge,
-    SNARKError,
-    SNARK,
 };
 use rand::RngCore;
 use snarkvm_curves::PairingEngine;
 use snarkvm_fields::{One, PrimeField, ToConstraintField, Zero};
-use snarkvm_utilities::{to_bytes_le, ToBytes};
+use snarkvm_utilities::{ToBytes, to_bytes_le};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{Result, anyhow, bail, ensure};
 use core::marker::PhantomData;
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
 use std::{borrow::Borrow, collections::BTreeMap, ops::Deref, sync::Arc};
 
 use crate::srs::UniversalProver;
-#[cfg(not(feature = "std"))]
 use snarkvm_utilities::println;
 
 /// The Varuna proof system.
@@ -332,7 +332,7 @@ where
 
     /// This is the main entrypoint for creating proofs.
     /// You can find a specification of the prover algorithm in:
-    /// https://github.com/AleoHQ/protocol-docs
+    /// https://github.com/ProvableHQ/protocol-docs
     fn prove_batch<C: ConstraintSynthesizer<E::Fr>, R: Rng + CryptoRng>(
         universal_prover: &Self::UniversalProver,
         fs_parameters: &Self::FSParameters,
@@ -621,7 +621,7 @@ where
 
     /// This is the main entrypoint for verifying proofs.
     /// You can find a specification of the verifier algorithm in:
-    /// https://github.com/AleoHQ/protocol-docs
+    /// https://github.com/ProvableHQ/protocol-docs
     fn verify_batch<B: Borrow<Self::VerifierInput>>(
         universal_verifier: &Self::UniversalVerifier,
         fs_parameters: &Self::FSParameters,

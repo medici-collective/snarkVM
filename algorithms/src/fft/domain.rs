@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -31,7 +32,7 @@ use crate::{
     cfg_iter_mut,
     fft::{DomainCoeff, SparsePolynomial},
 };
-use snarkvm_fields::{batch_inversion, FftField, FftParameters, Field};
+use snarkvm_fields::{FftField, FftParameters, Field, batch_inversion};
 #[cfg(not(feature = "serial"))]
 use snarkvm_utilities::max_available_threads;
 use snarkvm_utilities::{execute_with_max_available_threads, serialize::*};
@@ -39,7 +40,7 @@ use snarkvm_utilities::{execute_with_max_available_threads, serialize::*};
 use rand::Rng;
 use std::{borrow::Cow, fmt};
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 
 #[cfg(not(feature = "serial"))]
 use rayon::prelude::*;

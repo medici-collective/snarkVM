@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -20,7 +21,7 @@ mod commit_uncompressed;
 mod hash;
 mod hash_uncompressed;
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 use snarkvm_circuit_types::environment::assert_scope;
 
 use crate::{Commit, CommitUncompressed, Hash, HashUncompressed};
@@ -59,7 +60,7 @@ pub struct BHP<E: Environment, const NUM_WINDOWS: u8, const WINDOW_SIZE: u8> {
     hasher: BHPHasher<E, NUM_WINDOWS, WINDOW_SIZE>,
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment, const NUM_WINDOWS: u8, const WINDOW_SIZE: u8> Inject for BHP<E, NUM_WINDOWS, WINDOW_SIZE> {
     type Primitive = console::BHP<E::Network, NUM_WINDOWS, WINDOW_SIZE>;
 
@@ -84,7 +85,7 @@ impl<E: Environment, const NUM_WINDOWS: u8, const WINDOW_SIZE: u8> Inject for BH
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
     use snarkvm_circuit_types::environment::{Circuit, Eject};

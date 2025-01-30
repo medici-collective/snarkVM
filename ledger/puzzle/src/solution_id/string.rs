@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -78,7 +79,7 @@ mod tests {
             // Check the string representation.
             let candidate = format!("{expected}");
             assert_eq!(expected, SolutionID::from_str(&candidate)?);
-            assert_eq!(SOLUTION_ID_PREFIX, candidate.to_string().split('1').next().unwrap());
+            assert_eq!(SOLUTION_ID_PREFIX, candidate.split('1').next().unwrap());
         }
         Ok(())
     }

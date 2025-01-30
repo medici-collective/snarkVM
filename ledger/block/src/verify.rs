@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -173,6 +174,15 @@ impl<N: Network> Block<N> {
                     subdag.anchor_round(),
                     previous_round
                 );
+                // Ensure that the rounds in the subdag are sequential.
+                if previous_round != 0 {
+                    for round in previous_round..=subdag.anchor_round() {
+                        ensure!(
+                            subdag.contains_key(&round),
+                            "Subdag is missing round {round} in block {expected_height}",
+                        );
+                    }
+                }
                 // Output the subdag anchor round.
                 subdag.anchor_round()
             }
@@ -378,9 +388,12 @@ impl<N: Network> Block<N> {
         )?;
 
         // Calculate the expected coinbase reward.
-        let expected_coinbase_reward = coinbase_reward(
+        let expected_coinbase_reward = coinbase_reward::<N>(
             height,
+            timestamp,
+            N::GENESIS_TIMESTAMP,
             N::STARTING_SUPPLY,
+            N::ANCHOR_TIME,
             N::ANCHOR_HEIGHT,
             N::BLOCK_TIME,
             combined_proof_target,
@@ -392,9 +405,17 @@ impl<N: Network> Block<N> {
         let expected_transaction_fees =
             self.transactions.iter().map(|tx| Ok(*tx.priority_fee_amount()?)).sum::<Result<u64>>()?;
 
+        // Calculate the time since last block.
+        let time_since_last_block = timestamp.saturating_sub(previous_block.timestamp());
         // Compute the expected block reward.
-        let expected_block_reward =
-            block_reward(N::STARTING_SUPPLY, N::BLOCK_TIME, expected_coinbase_reward, expected_transaction_fees);
+        let expected_block_reward = block_reward::<N>(
+            height,
+            N::STARTING_SUPPLY,
+            N::BLOCK_TIME,
+            time_since_last_block,
+            expected_coinbase_reward,
+            expected_transaction_fees,
+        );
         // Compute the expected puzzle reward.
         let expected_puzzle_reward = puzzle_reward(expected_coinbase_reward);
 

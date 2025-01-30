@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,7 +14,7 @@
 // limitations under the License.
 
 use super::*;
-use snarkvm_circuit_algorithms::{Hash, Keccak, Poseidon, BHP};
+use snarkvm_circuit_algorithms::{BHP, Hash, Keccak, Poseidon};
 
 /// A trait for a Merkle path hash function.
 pub trait PathHash<E: Environment> {
@@ -90,10 +91,10 @@ impl<E: Environment, const TYPE: u8, const VARIANT: usize> PathHash<E> for Kecca
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
-    use snarkvm_circuit_algorithms::{Keccak256, Poseidon2, Sha3_256, BHP512};
+    use snarkvm_circuit_algorithms::{BHP512, Keccak256, Poseidon2, Sha3_256};
     use snarkvm_circuit_types::environment::Circuit;
     use snarkvm_utilities::{TestRng, Uniform};
 

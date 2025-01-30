@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -18,7 +19,7 @@ use crate::fft::domain::{FFTPrecomputation, IFFTPrecomputation};
 
 /// A struct that helps multiply a batch of polynomials
 use super::*;
-use snarkvm_utilities::{cfg_into_iter, cfg_iter, cfg_iter_mut, cfg_reduce_with, ExecutionPool};
+use snarkvm_utilities::{ExecutionPool, cfg_into_iter, cfg_iter, cfg_iter_mut, cfg_reduce_with};
 
 #[derive(Default)]
 pub struct PolyMultiplier<'a, F: PrimeField> {

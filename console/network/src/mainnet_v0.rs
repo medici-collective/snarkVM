@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,22 +15,22 @@
 
 use super::*;
 use snarkvm_console_algorithms::{
+    BHP256,
+    BHP512,
+    BHP768,
+    BHP1024,
     Blake2Xs,
     Keccak256,
     Keccak384,
     Keccak512,
-    Pedersen128,
     Pedersen64,
+    Pedersen128,
     Poseidon2,
     Poseidon4,
     Poseidon8,
     Sha3_256,
     Sha3_384,
     Sha3_512,
-    BHP1024,
-    BHP256,
-    BHP512,
-    BHP768,
 };
 
 lazy_static! {
@@ -133,6 +134,13 @@ impl Network for MainnetV0 {
     /// The transmission checksum type.
     type TransmissionChecksum = u128;
 
+    /// The block height from which consensus V2 rules apply.
+    #[cfg(not(any(test, feature = "test")))]
+    const CONSENSUS_V2_HEIGHT: u32 = 2_800_000;
+    // TODO (raychu86): Update this value based on the desired mainnet height.
+    /// The block height from which consensus V2 rules apply.
+    #[cfg(any(test, feature = "test"))]
+    const CONSENSUS_V2_HEIGHT: u32 = 10;
     /// The network edition.
     const EDITION: u16 = 0;
     /// The genesis block coinbase target.
@@ -150,13 +158,13 @@ impl Network for MainnetV0 {
     #[cfg(feature = "test")]
     const GENESIS_PROOF_TARGET: u64 = 1u64 << 3;
     /// The fixed timestamp of the genesis block.
-    const GENESIS_TIMESTAMP: i64 = 1696118400 /* 2023-10-01 00:00:00 UTC */;
+    const GENESIS_TIMESTAMP: i64 = 1725462000 /* 2024-09-04 11:00:00 UTC */;
     /// The network ID.
     const ID: u16 = 0;
     /// The function name for the inclusion circuit.
     const INCLUSION_FUNCTION_NAME: &'static str = snarkvm_parameters::mainnet::NETWORK_INCLUSION_FUNCTION_NAME;
     /// The maximum number of certificates in a batch.
-    const MAX_CERTIFICATES: u16 = 15;
+    const MAX_CERTIFICATES: u16 = 16;
     /// The network name.
     const NAME: &'static str = "Aleo Mainnet (v0)";
 

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -18,8 +19,8 @@ extern crate criterion;
 use snarkvm_console_algorithms::Sha3_256;
 use snarkvm_console_collections::kary_merkle_tree::KaryMerkleTree;
 use snarkvm_console_network::{
-    prelude::{TestRng, ToBits, Uniform},
     MainnetV0,
+    prelude::{TestRng, ToBits, Uniform},
 };
 use snarkvm_console_types::Field;
 

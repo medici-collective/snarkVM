@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -35,17 +36,17 @@ mod testnet_v0;
 pub use testnet_v0::*;
 
 pub mod prelude {
-    pub use crate::{environment::prelude::*, Network};
+    pub use crate::{Network, environment::prelude::*};
 }
 
 use crate::environment::prelude::*;
 use snarkvm_algorithms::{
+    AlgebraicSponge,
     crypto_hash::PoseidonSponge,
     snark::varuna::{CircuitProvingKey, CircuitVerifyingKey, VarunaHidingMode},
     srs::{UniversalProver, UniversalVerifier},
-    AlgebraicSponge,
 };
-use snarkvm_console_algorithms::{Poseidon2, Poseidon4, BHP1024, BHP512};
+use snarkvm_console_algorithms::{BHP512, BHP1024, Poseidon2, Poseidon4};
 use snarkvm_console_collections::merkle_tree::{MerklePath, MerkleTree};
 use snarkvm_console_types::{Field, Group, Scalar};
 use snarkvm_curves::PairingEngine;
@@ -90,25 +91,18 @@ pub trait Network:
     /// The network edition.
     const EDITION: u16;
 
+    /// The block height from which consensus V2 rules apply.
+    const CONSENSUS_V2_HEIGHT: u32;
+
     /// The function name for the inclusion circuit.
     const INCLUSION_FUNCTION_NAME: &'static str;
 
     /// The fixed timestamp of the genesis block.
     const GENESIS_TIMESTAMP: i64;
     /// The genesis block coinbase target.
-    #[cfg(not(feature = "test"))]
-    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 29).saturating_sub(1);
-    /// The genesis block coinbase target.
-    /// This is deliberately set to a low value (32) for testing purposes only.
-    #[cfg(feature = "test")]
-    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 5).saturating_sub(1);
+    const GENESIS_COINBASE_TARGET: u64;
     /// The genesis block proof target.
-    #[cfg(not(feature = "test"))]
-    const GENESIS_PROOF_TARGET: u64 = 1u64 << 27;
-    /// The genesis block proof target.
-    /// This is deliberately set to a low value (8) for testing purposes only.
-    #[cfg(feature = "test")]
-    const GENESIS_PROOF_TARGET: u64 = 1u64 << 3;
+    const GENESIS_PROOF_TARGET: u64;
     /// The maximum number of solutions that can be included per block as a power of 2.
     const MAX_SOLUTIONS_AS_POWER_OF_TWO: u8 = 2; // 4 solutions
     /// The maximum number of solutions that can be included per block.

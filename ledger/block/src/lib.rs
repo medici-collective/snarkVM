@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -604,7 +605,7 @@ pub mod test_helpers {
     use super::*;
     use console::account::{Address, PrivateKey};
     use ledger_query::Query;
-    use ledger_store::{helpers::memory::BlockMemory, BlockStore};
+    use ledger_store::{BlockStore, helpers::memory::BlockMemory};
     use synthesizer_process::Process;
 
     use once_cell::sync::OnceCell;
@@ -705,13 +706,41 @@ pub mod test_helpers {
         // Return the block, transaction, and private key.
         (block, transaction, private_key)
     }
+
+    pub(crate) fn sample_metadata() -> Metadata<CurrentNetwork> {
+        let network = CurrentNetwork::ID;
+        let round = u64::MAX;
+        let height = u32::MAX;
+        let cumulative_weight = u128::MAX - 1;
+        let cumulative_proof_target = u128::MAX - 1;
+        let coinbase_target = u64::MAX;
+        let proof_target = u64::MAX - 1;
+        let last_coinbase_target = u64::MAX;
+        let timestamp = i64::MAX - 1;
+        let last_coinbase_timestamp = timestamp - 1;
+        Metadata::new(
+            network,
+            round,
+            height,
+            cumulative_weight,
+            cumulative_proof_target,
+            coinbase_target,
+            proof_target,
+            last_coinbase_target,
+            last_coinbase_timestamp,
+            timestamp,
+        )
+        .unwrap()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use console::network::MainnetV0;
     use indexmap::IndexMap;
+    type CurrentNetwork = MainnetV0;
 
     #[test]
     fn test_find_transaction_for_transition_id() {
@@ -848,5 +877,13 @@ mod tests {
             assert_eq!(transactions.find_record(commitment), None);
             assert_eq!(transaction.find_record(commitment), None);
         }
+    }
+
+    #[test]
+    fn test_serde_metadata() {
+        let metadata = crate::test_helpers::sample_metadata();
+        let json_metadata = serde_json::to_string(&metadata).unwrap();
+        let deserialized_metadata: Metadata<CurrentNetwork> = serde_json::from_str(&json_metadata).unwrap();
+        assert_eq!(metadata, deserialized_metadata);
     }
 }

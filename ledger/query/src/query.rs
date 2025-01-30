@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -67,13 +68,13 @@ impl<N: Network, B: BlockStorage<N>> QueryTrait<N> for Query<N, B> {
             Self::VM(block_store) => Ok(block_store.current_state_root()),
             Self::REST(url) => match N::ID {
                 console::network::MainnetV0::ID => {
-                    Ok(Self::get_request(&format!("{url}/mainnet/latest/stateRoot"))?.into_json()?)
+                    Ok(Self::get_request(&format!("{url}/mainnet/stateRoot/latest"))?.into_json()?)
                 }
                 console::network::TestnetV0::ID => {
-                    Ok(Self::get_request(&format!("{url}/testnet/latest/stateRoot"))?.into_json()?)
+                    Ok(Self::get_request(&format!("{url}/testnet/stateRoot/latest"))?.into_json()?)
                 }
                 console::network::CanaryV0::ID => {
-                    Ok(Self::get_request(&format!("{url}/canary/latest/stateRoot"))?.into_json()?)
+                    Ok(Self::get_request(&format!("{url}/canary/stateRoot/latest"))?.into_json()?)
                 }
                 _ => bail!("Unsupported network ID in inclusion query"),
             },
@@ -87,13 +88,13 @@ impl<N: Network, B: BlockStorage<N>> QueryTrait<N> for Query<N, B> {
             Self::VM(block_store) => Ok(block_store.current_state_root()),
             Self::REST(url) => match N::ID {
                 console::network::MainnetV0::ID => {
-                    Ok(Self::get_request_async(&format!("{url}/mainnet/latest/stateRoot")).await?.json().await?)
+                    Ok(Self::get_request_async(&format!("{url}/mainnet/stateRoot/latest")).await?.json().await?)
                 }
                 console::network::TestnetV0::ID => {
-                    Ok(Self::get_request_async(&format!("{url}/testnet/latest/stateRoot")).await?.json().await?)
+                    Ok(Self::get_request_async(&format!("{url}/testnet/stateRoot/latest")).await?.json().await?)
                 }
                 console::network::CanaryV0::ID => {
-                    Ok(Self::get_request_async(&format!("{url}/canary/latest/stateRoot")).await?.json().await?)
+                    Ok(Self::get_request_async(&format!("{url}/canary/stateRoot/latest")).await?.json().await?)
                 }
                 _ => bail!("Unsupported network ID in inclusion query"),
             },
@@ -133,6 +134,45 @@ impl<N: Network, B: BlockStorage<N>> QueryTrait<N> for Query<N, B> {
                 }
                 console::network::CanaryV0::ID => {
                     Ok(Self::get_request_async(&format!("{url}/canary/statePath/{commitment}")).await?.json().await?)
+                }
+                _ => bail!("Unsupported network ID in inclusion query"),
+            },
+        }
+    }
+
+    /// Returns a state path for the given `commitment`.
+    fn current_block_height(&self) -> Result<u32> {
+        match self {
+            Self::VM(block_store) => Ok(block_store.max_height().unwrap_or_default()),
+            Self::REST(url) => match N::ID {
+                console::network::MainnetV0::ID => {
+                    Ok(Self::get_request(&format!("{url}/mainnet/block/height/latest"))?.into_json()?)
+                }
+                console::network::TestnetV0::ID => {
+                    Ok(Self::get_request(&format!("{url}/testnet/block/height/latest"))?.into_json()?)
+                }
+                console::network::CanaryV0::ID => {
+                    Ok(Self::get_request(&format!("{url}/canary/block/height/latest"))?.into_json()?)
+                }
+                _ => bail!("Unsupported network ID in inclusion query"),
+            },
+        }
+    }
+
+    /// Returns a state path for the given `commitment`.
+    #[cfg(feature = "async")]
+    async fn current_block_height_async(&self) -> Result<u32> {
+        match self {
+            Self::VM(block_store) => Ok(block_store.max_height().unwrap_or_default()),
+            Self::REST(url) => match N::ID {
+                console::network::MainnetV0::ID => {
+                    Ok(Self::get_request_async(&format!("{url}/mainnet/block/height/latest")).await?.json().await?)
+                }
+                console::network::TestnetV0::ID => {
+                    Ok(Self::get_request_async(&format!("{url}/testnet/block/height/latest")).await?.json().await?)
+                }
+                console::network::CanaryV0::ID => {
+                    Ok(Self::get_request_async(&format!("{url}/canary/block/height/latest")).await?.json().await?)
                 }
                 _ => bail!("Unsupported network ID in inclusion query"),
             },

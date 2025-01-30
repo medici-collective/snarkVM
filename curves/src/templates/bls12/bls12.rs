@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    AffineCurve,
     templates::{
         bls12::{
             g1::{G1Affine, G1Prepared, G1Projective},
@@ -21,19 +23,18 @@ use crate::{
         short_weierstrass_jacobian,
     },
     traits::{ModelParameters, PairingCurve, PairingEngine, ShortWeierstrassParameters},
-    AffineCurve,
 };
 use snarkvm_fields::{
-    fp6_3over2::Fp6Parameters,
     Field,
-    Fp12,
-    Fp12Parameters,
     Fp2,
     Fp2Parameters,
+    Fp12,
+    Fp12Parameters,
     One,
     PrimeField,
     SquareRootField,
     Zero,
+    fp6_3over2::Fp6Parameters,
 };
 use snarkvm_utilities::bititerator::BitIteratorBE;
 

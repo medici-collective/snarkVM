@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -129,7 +130,7 @@ mod tests {
                 Field::<Circuit>::new(mode, console::Field::from_bits_be(&bits_be).unwrap())
             };
 
-            Circuit::scope(&format!("{mode} {i}"), || {
+            Circuit::scope(format!("{mode} {i}"), || {
                 let num_bits_with_capacity = I::BITS + 1;
                 let candidate = candidate.to_upper_bits_be(num_bits_with_capacity as usize);
                 assert_eq!(num_bits_with_capacity, candidate.len() as u64);

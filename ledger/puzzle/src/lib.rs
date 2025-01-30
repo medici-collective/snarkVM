@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -33,6 +34,9 @@ use console::{
     algorithms::Sha3_256,
     collections::kary_merkle_tree::KaryMerkleTree,
     prelude::{
+        FromBits,
+        Network,
+        Result,
         anyhow,
         bail,
         cfg_into_iter,
@@ -41,9 +45,6 @@ use console::{
         cfg_values,
         ensure,
         has_duplicates,
-        FromBits,
-        Network,
-        Result,
     },
     types::U64,
 };
@@ -172,7 +173,7 @@ impl<N: Network> Puzzle<N> {
                     // Ensure that the proof target matches the expected proof target.
                     ensure!(
                         solution.target() == *proof_target,
-                        "The proof target does not match the expected proof target"
+                        "The proof target does not match the cached proof target"
                     );
                     targets[i] = *proof_target
                 }
@@ -195,7 +196,7 @@ impl<N: Network> Puzzle<N> {
                     // Ensure that the proof target matches the expected proof target.
                     ensure!(
                         solution.target() == proof_target,
-                        "The proof target does not match the expected proof target"
+                        "The proof target does not match the computed proof target"
                     );
                     // Insert the proof target into the cache.
                     self.proof_target_cache.write().put(*solution_id, proof_target);

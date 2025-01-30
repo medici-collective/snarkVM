@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -36,7 +37,7 @@ mod evaluate;
 mod execute;
 mod helpers;
 
-use crate::{cost_in_microcredits, traits::*, CallMetrics, Process, Trace};
+use crate::{CallMetrics, Process, Trace, cost_in_microcredits_v2, traits::*};
 use console::{
     account::{Address, PrivateKey},
     network::prelude::*,
@@ -64,7 +65,7 @@ use console::{
     types::{Field, Group},
 };
 use ledger_block::{Deployment, Transition};
-use synthesizer_program::{traits::*, CallOperator, Closure, Function, Instruction, Operand, Program};
+use synthesizer_program::{CallOperator, Closure, Function, Instruction, Operand, Program, traits::*};
 use synthesizer_snark::{Certificate, ProvingKey, UniversalSRS, VerifyingKey};
 
 use aleo_std::prelude::{finish, lap, timer};
@@ -192,6 +193,8 @@ pub struct Stack<N: Network> {
     finalize_costs: IndexMap<Identifier<N>, u64>,
     /// The program depth.
     program_depth: usize,
+    /// The program address.
+    program_address: Address<N>,
 }
 
 impl<N: Network> Stack<N> {
@@ -237,6 +240,12 @@ impl<N: Network> StackProgram<N> for Stack<N> {
     #[inline]
     fn program_depth(&self) -> usize {
         self.program_depth
+    }
+
+    /// Returns the program address.
+    #[inline]
+    fn program_address(&self) -> &Address<N> {
+        &self.program_address
     }
 
     /// Returns `true` if the stack contains the external record.

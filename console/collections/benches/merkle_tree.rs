@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -16,9 +17,9 @@
 extern crate criterion;
 
 use snarkvm_console_network::{
-    prelude::{TestRng, ToBits, Uniform},
     MainnetV0,
     Network,
+    prelude::{TestRng, ToBits, Uniform},
 };
 use snarkvm_console_types::Field;
 
@@ -163,12 +164,12 @@ fn update_vs_update_many(c: &mut Criterion) {
         let index = index % num_leaves;
         let new_leaf = generate_leaves!(1, &mut rng).pop().unwrap();
         // Benchmark the standard update operation.
-        group.bench_with_input(BenchmarkId::new("Single", &format!("{depth}")), &new_leaf, |b, new_leaf| {
+        group.bench_with_input(BenchmarkId::new("Single", format!("{depth}")), &new_leaf, |b, new_leaf| {
             b.iter_batched(|| tree.clone(), |mut tree| tree.update(index, new_leaf), BatchSize::SmallInput)
         });
         // Benchmark the `update_many` operation.
         group.bench_with_input(
-            BenchmarkId::new("Batch", &format!("{depth}")),
+            BenchmarkId::new("Batch", format!("{depth}")),
             &BTreeMap::from([(index, new_leaf)]),
             |b, updates| b.iter_batched(|| tree.clone(), |mut tree| tree.update_many(updates), BatchSize::SmallInput),
         );

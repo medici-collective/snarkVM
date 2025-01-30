@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -23,7 +24,7 @@ mod to_bits;
 mod to_field;
 
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Boolean, Field, U8};
+use snarkvm_circuit_types::{Boolean, Field, U8, environment::prelude::*};
 use snarkvm_utilities::ToBits as TB;
 
 /// An identifier is an **immutable** UTF-8 string,
@@ -38,7 +39,7 @@ use snarkvm_utilities::ToBits as TB;
 #[derive(Clone)]
 pub struct Identifier<A: Aleo>(Field<A>, u8); // Number of bytes in the identifier.
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for Identifier<A> {
     type Primitive = console::Identifier<A::Network>;
 
@@ -57,7 +58,7 @@ impl<A: Aleo> Inject for Identifier<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for Identifier<A> {
     type Primitive = console::Identifier<A::Network>;
 
@@ -76,7 +77,7 @@ impl<A: Aleo> Eject for Identifier<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Parser for Identifier<A> {
     /// Parses a UTF-8 string into an identifier.
     #[inline]
@@ -88,7 +89,7 @@ impl<A: Aleo> Parser for Identifier<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> FromStr for Identifier<A> {
     type Err = Error;
 
@@ -107,14 +108,14 @@ impl<A: Aleo> FromStr for Identifier<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Debug for Identifier<A> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         Display::fmt(self, f)
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Display for Identifier<A> {
     /// Prints the identifier as a string.
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -152,13 +153,13 @@ impl<A: Aleo> From<&Identifier<A>> for LinearCombination<A::BaseField> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 pub(crate) mod tests {
     use super::*;
     use crate::Circuit;
     use console::{Rng, TestRng};
 
-    use anyhow::{bail, Result};
+    use anyhow::{Result, bail};
     use core::str::FromStr;
     use rand::distributions::Alphanumeric;
 

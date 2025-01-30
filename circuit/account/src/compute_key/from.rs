@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -24,10 +25,10 @@ impl<A: Aleo> From<(Group<A>, Group<A>)> for ComputeKey<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
-    use crate::{helpers::generate_account, Circuit};
+    use crate::{Circuit, helpers::generate_account};
 
     use anyhow::Result;
     use snarkvm_circuit_network::AleoV0;
@@ -49,7 +50,7 @@ mod tests {
             let pk_sig = Group::new(mode, compute_key.pk_sig());
             let pr_sig = Group::new(mode, compute_key.pr_sig());
 
-            Circuit::scope(&format!("{mode} {i}"), || {
+            Circuit::scope(format!("{mode} {i}"), || {
                 let candidate = ComputeKey::<AleoV0>::from((pk_sig, pr_sig));
                 assert_eq!(compute_key, candidate.eject_value());
                 if i > 0 {

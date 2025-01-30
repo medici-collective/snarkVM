@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,20 +16,20 @@
 use core::marker::PhantomData;
 
 use crate::{
+    AlgebraicSponge,
     fft::EvaluationDomain,
     snark::varuna::{
+        SNARKMode,
         ahp::{
-            indexer::{CircuitId, CircuitInfo},
-            verifier::{BatchCombiners, FirstMessage, FourthMessage, QuerySet, SecondMessage, State, ThirdMessage},
             AHPError,
             AHPForR1CS,
+            indexer::{CircuitId, CircuitInfo},
+            verifier::{BatchCombiners, FirstMessage, FourthMessage, QuerySet, SecondMessage, State, ThirdMessage},
         },
         verifier::CircuitSpecificState,
-        SNARKMode,
     },
-    AlgebraicSponge,
 };
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use smallvec::SmallVec;
 use snarkvm_fields::PrimeField;
 use std::collections::BTreeMap;

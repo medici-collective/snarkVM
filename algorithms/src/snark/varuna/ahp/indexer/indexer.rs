@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,28 +16,27 @@
 use crate::{
     fft::EvaluationDomain,
     polycommit::sonic_pc::{LinearCombination, PolynomialInfo, PolynomialLabel},
-    r1cs::{errors::SynthesisError, ConstraintSynthesizer},
+    r1cs::{ConstraintSynthesizer, errors::SynthesisError},
     snark::varuna::{
-        ahp::{
-            indexer::{Circuit, CircuitId, CircuitInfo, ConstraintSystem as IndexerConstraintSystem},
-            AHPForR1CS,
-        },
-        matrices::{into_matrix_helper, matrix_evals, MatrixEvals},
-        num_non_zero,
         SNARKMode,
+        ahp::{
+            AHPForR1CS,
+            indexer::{Circuit, CircuitId, CircuitInfo, ConstraintSystem as IndexerConstraintSystem},
+        },
+        matrices::{MatrixEvals, into_matrix_helper, matrix_evals},
+        num_non_zero,
     },
 };
 use snarkvm_fields::PrimeField;
 use snarkvm_utilities::cfg_into_iter;
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 use core::marker::PhantomData;
 use itertools::Itertools;
 use std::collections::BTreeMap;
 
 #[cfg(not(feature = "serial"))]
 use rayon::prelude::*;
-#[cfg(not(feature = "std"))]
 use snarkvm_utilities::println;
 
 use super::Matrix;

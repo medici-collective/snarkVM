@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -18,7 +19,7 @@ use crate::{FinalizeGlobalState, Function, Operand, Program};
 use console::{
     account::Group,
     network::Network,
-    prelude::{bail, Result},
+    prelude::{Result, bail},
     program::{
         Future,
         Identifier,
@@ -67,6 +68,9 @@ pub trait StackProgram<N: Network> {
 
     /// Returns the program depth.
     fn program_depth(&self) -> usize;
+
+    /// Returns the program address.
+    fn program_address(&self) -> &Address<N>;
 
     /// Returns `true` if the stack contains the external record.
     fn contains_external_record(&self, locator: &Locator<N>) -> bool;

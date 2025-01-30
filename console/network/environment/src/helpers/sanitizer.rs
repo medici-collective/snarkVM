@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -12,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{string_parser::is_char_supported, ParserResult};
+use crate::{ParserResult, string_parser::is_char_supported};
 
 use nom::{
     branch::alt,
@@ -116,12 +117,33 @@ impl Sanitizer {
     ///
     /// Discard any leading newline.
     fn str_till_eol(string: &str) -> ParserResult<&str> {
-        map(
-            recognize(Self::till(alt((value((), tag("\\\n")), value((), Sanitizer::parse_safe_char))), Self::eol)),
-            |i| {
-                if i.as_bytes().last() == Some(&b'\n') { &i[0..i.len() - 1] } else { i }
-            },
-        )(string)
+        // A heuristic approach is applied here in order to avoid
+        // costly parsing operations in the most common scenarios.
+        if let Some((before, after)) = string.split_once('\n') {
+            let is_multiline = before.ends_with('\\');
+
+            if !is_multiline {
+                let contains_unsafe_chars = !before.chars().all(is_char_supported);
+
+                if !contains_unsafe_chars {
+                    Ok((after, before))
+                } else {
+                    recognize(Self::till(value((), Sanitizer::parse_safe_char), Self::eol))(before)
+                }
+            } else {
+                map(
+                    recognize(Self::till(
+                        alt((value((), tag("\\\n")), value((), Sanitizer::parse_safe_char))),
+                        Self::eol,
+                    )),
+                    |i| {
+                        if i.as_bytes().last() == Some(&b'\n') { &i[0..i.len() - 1] } else { i }
+                    },
+                )(string)
+            }
+        } else {
+            Ok((string, ""))
+        }
     }
 
     /// Parse a string until `*/` is encountered.

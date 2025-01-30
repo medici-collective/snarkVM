@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,7 +15,7 @@
 
 use super::*;
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> FromBits for ComputeKey<A> {
     type Boolean = Boolean<A>;
 
@@ -53,7 +54,7 @@ impl<A: Aleo> FromBits for ComputeKey<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
     use crate::Circuit;
@@ -72,7 +73,7 @@ mod tests {
             let expected = console::ComputeKey::try_from(console::PrivateKey::new(rng).unwrap()).unwrap();
             let candidate = ComputeKey::<CurrentAleo>::new(mode, expected).to_bits_le();
 
-            CurrentAleo::scope(&format!("{mode} {i}"), || {
+            CurrentAleo::scope(format!("{mode} {i}"), || {
                 let candidate = ComputeKey::<CurrentAleo>::from_bits_le(&candidate);
                 assert_eq!(expected, candidate.eject_value());
                 assert_scope!(num_constants, num_public, num_private, num_constraints);
@@ -89,7 +90,7 @@ mod tests {
             let expected = console::ComputeKey::try_from(console::PrivateKey::new(rng).unwrap()).unwrap();
             let candidate = ComputeKey::<CurrentAleo>::new(mode, expected).to_bits_be();
 
-            CurrentAleo::scope(&format!("{mode} {i}"), || {
+            CurrentAleo::scope(format!("{mode} {i}"), || {
                 let candidate = ComputeKey::<CurrentAleo>::from_bits_be(&candidate);
                 assert_eq!(expected, candidate.eject_value());
                 assert_scope!(num_constants, num_public, num_private, num_constraints);

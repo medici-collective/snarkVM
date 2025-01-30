@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -22,8 +23,6 @@ use console::LiteralType;
 use snarkvm_circuit_algorithms::Elligator2;
 use snarkvm_circuit_network::Aleo;
 use snarkvm_circuit_types::prelude::{
-    bail,
-    integers::Integer,
     Address,
     Boolean,
     Environment,
@@ -34,6 +33,7 @@ use snarkvm_circuit_types::prelude::{
     Group,
     Inject,
     IntegerType,
+    MSB,
     One,
     Result,
     Scalar,
@@ -42,11 +42,12 @@ use snarkvm_circuit_types::prelude::{
     ToField,
     ToGroup,
     Zero,
-    MSB,
+    bail,
+    integers::Integer,
 };
 
 #[cfg(test)]
-use snarkvm_circuit_types::prelude::{I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
+use snarkvm_circuit_types::prelude::{I8, I16, I32, I64, I128, U8, U16, U32, U64, U128};
 
 /// Unary operator for casting values of one type to another, with lossy truncation.
 pub trait CastLossy<T: Sized = Self> {
@@ -67,6 +68,7 @@ impl<A: Aleo> Literal<A> {
     ///  - (`Address`, `Group`) <-> `Field` <-> `Scalar` <-> `Integer` <-> `Boolean`
     ///  - `Signature` (not supported)
     ///  - `String` (not supported)
+    ///
     /// Note that casting to left along the hierarchy always preserves information.
     pub fn cast_lossy(&self, to_type: LiteralType) -> Result<Self> {
         match self {

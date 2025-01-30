@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -64,8 +65,11 @@ impl<N: Network> EpochProgram<N> {
                 bail!("Failed to execute instruction ({instruction}): {error}");
             }
 
-            #[cfg(feature = "debug")]
+            #[cfg(debug_assertions)]
             {
+                use circuit::Eject;
+                use snarkvm_synthesizer_program::RegistersLoadCircuit;
+
                 use colored::Colorize;
 
                 let is_satisfied = A::is_satisfied();
@@ -75,7 +79,6 @@ impl<N: Network> EpochProgram<N> {
                 );
                 if !is_satisfied {
                     for operand in instruction.operands() {
-                        use synthesizer_program::RegistersLoadCircuit;
                         let value = registers.load_circuit(&self.stack, operand)?;
                         println!("    {operand} = {}", value.eject_value());
                     }

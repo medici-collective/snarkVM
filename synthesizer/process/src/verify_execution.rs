@@ -112,6 +112,14 @@ impl<N: Network> Process<N> {
             ensure!(function.inputs().len() == num_inputs, "The number of transition inputs is incorrect");
             ensure!(function.outputs().len() == num_outputs, "The number of transition outputs is incorrect");
 
+            // Ensure the input and output types are equivalent to the ones defined in the function.
+            // We only need to check that the variant type matches because we already check the hashes in
+            // the `Input::verify` and `Output::verify` functions.
+            let transition_input_variants = transition.inputs().iter().map(Input::variant).collect::<Vec<_>>();
+            let transition_output_variants = transition.outputs().iter().map(Output::variant).collect::<Vec<_>>();
+            ensure!(function.input_variants() == transition_input_variants, "The input variants do not match");
+            ensure!(function.output_variants() == transition_output_variants, "The output variants do not match");
+
             // Retrieve the parent program ID.
             // Note: The last transition in the execution does not have a parent, by definition.
             let parent = reverse_call_graph.get(transition.id()).and_then(|tid| execution.get_program_id(tid));
@@ -179,8 +187,12 @@ impl<N: Network> Process<N> {
             // If there is no parent, then `is_root` is `1` and `parent` is the root program ID.
             None => (Field::one(), *transition.program_id()),
         };
+
+        // Retrieve the adress belonging to the parent.
+        let parent_address = self.get_stack(parent)?.program_address();
+
         // Compute the x- and y-coordinate of `parent`.
-        let (parent_x, parent_y) = parent.to_address()?.to_xy_coordinates();
+        let (parent_x, parent_y) = parent_address.to_xy_coordinates();
 
         // [Inputs] Construct the verifier inputs to verify the proof.
         let mut inputs = vec![N::Field::one(), *tpk_x, *tpk_y, **transition.tcm(), **transition.scm()];

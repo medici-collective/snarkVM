@@ -69,6 +69,9 @@ pub trait StackProgram<N: Network> {
     /// Returns the program depth.
     fn program_depth(&self) -> usize;
 
+    /// Returns the program address.
+    fn program_address(&self) -> &Address<N>;
+
     /// Returns `true` if the stack contains the external record.
     fn contains_external_record(&self, locator: &Locator<N>) -> bool;
 
@@ -120,6 +123,9 @@ pub trait FinalizeRegistersState<N: Network> {
 
     /// Returns the function name for the finalize scope.
     fn function_name(&self) -> &Identifier<N>;
+
+    /// Returns the nonce for the finalize registers.
+    fn nonce(&self) -> u64;
 }
 
 pub trait RegistersSigner<N: Network> {

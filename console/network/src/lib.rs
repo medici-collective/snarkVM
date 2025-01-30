@@ -93,6 +93,8 @@ pub trait Network:
 
     /// The block height from which consensus V2 rules apply.
     const CONSENSUS_V2_HEIGHT: u32;
+    /// The block height from which consensus V3 rules apply.
+    const CONSENSUS_V3_HEIGHT: u32;
 
     /// The function name for the inclusion circuit.
     const INCLUSION_FUNCTION_NAME: &'static str;
@@ -192,21 +194,14 @@ pub trait Network:
     /// The maximum number of imports.
     const MAX_IMPORTS: usize = 64;
 
+    /// The maximum number of certificates in a batch before consensus V3 rules apply.
+    const MAX_CERTIFICATES_BEFORE_V3: u16;
     /// The maximum number of certificates in a batch.
+    // Note: This value must **not** be changed without considering the impact on serialization.
+    //  Decreasing this value will break backwards compatibility of serialization without explicit
+    //  declaration of migration based on round number rather than block height.
+    //  Increasing this value will require a migration to prevent forking during network upgrades.
     const MAX_CERTIFICATES: u16;
-    /// The maximum number of transmissions per batch.
-    /// Note: This limit is set to 50 as part of safety measures to prevent DoS attacks.
-    /// This limit can be increased in the future as performance improves. Alternatively,
-    /// the rate of block production can be sped up to compensate for the limit set here.
-    const MAX_TRANSMISSIONS_PER_BATCH: u16 = 50;
-
-    /// The maximum number of stacks in the process
-    /// Allows for fast processing for blocks made from 4 maximally full rounds.
-    #[cfg(not(feature = "test"))]
-    const MAX_STACKS: usize = Self::MAX_TRANSMISSIONS_PER_BATCH as usize * Self::MAX_CERTIFICATES as usize * 4;
-    /// The maximum number of stacks in the process.
-    #[cfg(feature = "test")]
-    const MAX_STACKS: usize = 64;
 
     /// The maximum number of bytes in a transaction.
     // Note: This value must **not** be decreased as it would invalidate existing transactions.

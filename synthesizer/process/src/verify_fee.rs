@@ -22,13 +22,14 @@ impl<N: Network> Process<N> {
     pub fn verify_fee(&self, fee: &Fee<N>, deployment_or_execution_id: Field<N>) -> Result<()> {
         let timer = timer!("Process::verify_fee");
 
+        // Retrieve the stack.
+        let stack = self.get_stack(fee.program_id())?;
+        // Retrieve the function from the stack.
+        let function = stack.get_function(fee.function_name())?;
+
         #[cfg(debug_assertions)]
         {
             println!("Verifying fee from {}/{}...", fee.program_id(), fee.function_name());
-            // Retrieve the stack.
-            let stack = self.get_stack(fee.program_id())?;
-            // Retrieve the function from the stack.
-            let function = stack.get_function(fee.function_name())?;
             // Ensure the number of function calls in this function is 1.
             if stack.get_number_of_calls(function.name())? != 1 {
                 bail!("The number of function calls in '{}/{}' should be 1", stack.program_id(), function.name())
@@ -51,6 +52,14 @@ impl<N: Network> Process<N> {
         ensure!(fee.inputs().len() <= N::MAX_INPUTS, "Fee exceeded maximum number of inputs");
         // Ensure the number of outputs is within the allowed range.
         ensure!(fee.outputs().len() <= N::MAX_INPUTS, "Fee exceeded maximum number of outputs");
+
+        // Ensure the input and output types are equivalent to the ones defined in the function.
+        // We only need to check that the variant type matches because we already check the hashes in
+        // the `Input::verify` and `Output::verify` functions.
+        let fee_input_variants = fee.inputs().iter().map(Input::variant).collect::<Vec<_>>();
+        let fee_output_variants = fee.outputs().iter().map(Output::variant).collect::<Vec<_>>();
+        ensure!(function.input_variants() == fee_input_variants, "The fee input variants do not match");
+        ensure!(function.output_variants() == fee_output_variants, "The fee output variants do not match");
 
         // Retrieve the candidate deployment or execution ID.
         let Ok(candidate_id) = fee.deployment_or_execution_id() else {
@@ -116,8 +125,11 @@ impl<N: Network> Process<N> {
         // Compute the x- and y-coordinate of `tpk`.
         let (tpk_x, tpk_y) = fee.tpk().to_xy_coordinates();
 
+        // Retrieve the adress belonging to the program ID.
+        let program_adress = self.get_stack(fee.program_id())?.program_address();
+
         // Compute the x- and y-coordinate of `parent`.
-        let (parent_x, parent_y) = fee.program_id().to_address()?.to_xy_coordinates();
+        let (parent_x, parent_y) = program_adress.to_xy_coordinates();
 
         // Construct the public inputs to verify the proof.
         let mut inputs = vec![N::Field::one(), *tpk_x, *tpk_y, **fee.tcm(), **fee.scm()];
@@ -185,8 +197,11 @@ impl<N: Network> Process<N> {
         // Compute the x- and y-coordinate of `tpk`.
         let (tpk_x, tpk_y) = fee.tpk().to_xy_coordinates();
 
+        // Retrieve the adress belonging to the program ID.
+        let program_adress = self.get_stack(fee.program_id())?.program_address();
+
         // Compute the x- and y-coordinate of `parent`.
-        let (parent_x, parent_y) = fee.program_id().to_address()?.to_xy_coordinates();
+        let (parent_x, parent_y) = program_adress.to_xy_coordinates();
 
         // Construct the public inputs to verify the proof.
         let mut inputs = vec![N::Field::one(), *tpk_x, *tpk_y, **fee.tcm(), **fee.scm()];
@@ -232,7 +247,7 @@ mod tests {
         ];
 
         // Construct a new process.
-        let process = Process::load_testing_only().unwrap();
+        let process = Process::load().unwrap();
 
         for transaction in transactions {
             match transaction {

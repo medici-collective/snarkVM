@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -27,7 +28,7 @@ use snarkvm_utilities::{
     Write,
 };
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{Result, anyhow, bail, ensure};
 use parking_lot::RwLock;
 use std::{collections::BTreeMap, ops::Range, sync::Arc};
 
@@ -414,7 +415,8 @@ impl<E: PairingEngine> PowersOfBetaG<E> {
                 NUM_POWERS_25 => Degree25::load_bytes()?,
                 NUM_POWERS_26 => Degree26::load_bytes()?,
                 NUM_POWERS_27 => Degree27::load_bytes()?,
-                NUM_POWERS_28 => Degree28::load_bytes()?,
+                // TODO (nkls): restore on CI.
+                // NUM_POWERS_28 => Degree28::load_bytes()?,
                 _ => bail!("Cannot download an invalid degree of '{num_powers}'"),
             };
 
@@ -491,7 +493,8 @@ impl<E: PairingEngine> PowersOfBetaG<E> {
                 NUM_POWERS_24 => ShiftedDegree24::load_bytes()?,
                 NUM_POWERS_25 => ShiftedDegree25::load_bytes()?,
                 NUM_POWERS_26 => ShiftedDegree26::load_bytes()?,
-                NUM_POWERS_27 => ShiftedDegree27::load_bytes()?,
+                // TODO (nkls): restore on CI.
+                // NUM_POWERS_27 => ShiftedDegree27::load_bytes()?,
                 _ => bail!("Cannot download an invalid degree of '{num_powers}'"),
             };
 

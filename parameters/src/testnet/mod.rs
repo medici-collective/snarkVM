@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,7 +16,10 @@
 pub mod genesis;
 pub use genesis::*;
 
-const REMOTE_URL: &str = "https://s3-us-west-1.amazonaws.com/testnet.parameters";
+/// The restrictions list as a JSON-compatible string.
+pub const RESTRICTIONS_LIST: &str = include_str!("./resources/restrictions.json");
+
+const REMOTE_URL: &str = "https://parameters.aleo.org/testnet";
 
 // BondPublic
 impl_remote!(BondPublicProver, REMOTE_URL, "resources/", "bond_public", "prover");

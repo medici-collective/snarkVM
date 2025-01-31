@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -43,7 +44,7 @@
 // 10. count committee[] == metadata[aleo1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3ljyzc]
 // 11. 100,000 + count committee[] >= count bonded[] >= count delegated[] >= count committee[]
 // 12. bond[*].microcredits > 100
-// 13. delegated[*] >= 10,000
+
 
 /**********************************************************************************************************************/
 
@@ -284,7 +285,7 @@ finalize bond_validator:
 // This function allows any delegator to bond their microcredits to a validator and specify a withdrawal address.
 //
 // The declared validator is **not** required to be in the committee yet, however it may **not** be unbonding.
-// This function enforces a minimum of 10,000 microcredits for each delegator.
+// This function enforces a minimum of 10,000 credits for each delegator.
 // The maximum number of delegators allowed in the committee is 100,000 delegator addresses.
 //
 // The corresponding functions for 'bond_public' are 'bond_validator', 'unbond_public', and 'claim_unbond_public'.

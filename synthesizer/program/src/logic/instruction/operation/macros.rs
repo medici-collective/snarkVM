@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -774,7 +775,8 @@ mod tests {
                                 }
                                 // These indicators are later used in the for-loops below.
                                 is_shift_operator |= true;
-                                shift_exceeds_bitwidth |= ((*b as u32) >= $input_a::<CurrentNetwork>::size_in_bits() as u32);
+                                let input_a_size_in_bits = u32::try_from($input_a::<CurrentNetwork>::size_in_bits()).expect("Input size in bits exceeded u32::MAX");
+                                shift_exceeds_bitwidth |= ((*b as u32) >= input_a_size_in_bits);
                             };
                             ("ensure divide by zero halts") => {
                                 should_succeed &= (*b) != *$input_b::<CurrentNetwork>::zero();

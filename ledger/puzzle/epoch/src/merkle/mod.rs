@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,7 +15,7 @@
 
 use console::{
     network::Network,
-    prelude::{cfg_into_iter, FromBytes, ToBits as TBits, ToBytes, Uniform},
+    prelude::{FromBytes, ToBits as TBits, ToBytes, Uniform, cfg_into_iter},
     types::Field,
 };
 use snarkvm_ledger_puzzle::PuzzleTrait;
@@ -72,7 +73,7 @@ impl<N: Network> MerklePuzzle<N> {
         // Seed a random number generator from the epoch hash.
         let mut epoch_rng = ChaChaRng::seed_from_u64(seed);
         // Sample a random number of leaves.
-        Ok(epoch_rng.gen_range(MIN_NUMBER_OF_LEAVES..MAX_NUMBER_OF_LEAVES))
+        Ok(epoch_rng.gen_range(MIN_NUMBER_OF_LEAVES..=MAX_NUMBER_OF_LEAVES))
     }
 }
 

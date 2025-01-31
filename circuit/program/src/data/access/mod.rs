@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,7 +15,7 @@
 
 use crate::Identifier;
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, U32};
+use snarkvm_circuit_types::{U32, environment::prelude::*};
 
 use std::{
     fmt,
@@ -31,7 +32,7 @@ pub enum Access<A: Aleo> {
     Index(U32<A>),
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for Access<A> {
     type Primitive = console::Access<A::Network>;
 
@@ -45,7 +46,7 @@ impl<A: Aleo> Inject for Access<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for Access<A> {
     type Primitive = console::Access<A::Network>;
 
@@ -66,7 +67,7 @@ impl<A: Aleo> Eject for Access<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Parser for Access<A> {
     /// Parses a UTF-8 string into an access.
     #[inline]
@@ -78,7 +79,7 @@ impl<A: Aleo> Parser for Access<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> FromStr for Access<A> {
     type Err = Error;
 
@@ -97,14 +98,14 @@ impl<A: Aleo> FromStr for Access<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Debug for Access<A> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         Display::fmt(self, f)
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Display for Access<A> {
     /// Prints the identifier as a string.
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

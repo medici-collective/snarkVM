@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -63,8 +64,8 @@ use synthesizer::{
 };
 
 use aleo_std::{
-    prelude::{finish, lap, timer},
     StorageMode,
+    prelude::{finish, lap, timer},
 };
 use anyhow::Result;
 use core::ops::Range;
@@ -126,7 +127,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         const NUM_BLOCKS: usize = 10;
         // Retrieve the latest height.
         let latest_height = ledger.current_block.read().height();
-        debug_assert_eq!(latest_height, *ledger.vm.block_store().heights().max().unwrap(), "Mismatch in latest height");
+        debug_assert_eq!(latest_height, ledger.vm.block_store().max_height().unwrap(), "Mismatch in latest height");
         // Sample random block heights.
         let block_heights: Vec<u32> =
             (0..=latest_height).choose_multiple(&mut OsRng, (latest_height as usize).min(NUM_BLOCKS));
@@ -169,7 +170,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         };
 
         // If the block store is empty, initialize the genesis block.
-        if ledger.vm.block_store().heights().max().is_none() {
+        if ledger.vm.block_store().max_height().is_none() {
             // Add the genesis block.
             ledger.advance_to_next_block(&genesis_block)?;
         }
@@ -177,7 +178,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
         // Retrieve the latest height.
         let latest_height =
-            *ledger.vm.block_store().heights().max().ok_or_else(|| anyhow!("Failed to load blocks from the ledger"))?;
+            ledger.vm.block_store().max_height().ok_or_else(|| anyhow!("Failed to load blocks from the ledger"))?;
         // Fetch the latest block.
         let block = ledger
             .get_block(latest_height)
@@ -391,9 +392,11 @@ pub(crate) mod test_helpers {
     };
     use ledger_block::Block;
     use ledger_store::ConsensusStore;
+    use snarkvm_circuit::network::AleoV0;
     use synthesizer::vm::VM;
 
     pub(crate) type CurrentNetwork = MainnetV0;
+    pub(crate) type CurrentAleo = AleoV0;
 
     #[cfg(not(feature = "rocks"))]
     pub(crate) type CurrentLedger =

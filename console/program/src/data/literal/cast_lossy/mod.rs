@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -20,7 +21,7 @@ mod scalar;
 use crate::{Literal, LiteralType};
 use snarkvm_console_algorithms::Elligator2;
 use snarkvm_console_network::Network;
-use snarkvm_console_types::{integers::Integer, prelude::*, Boolean};
+use snarkvm_console_types::{Boolean, integers::Integer, prelude::*};
 
 /// Unary operator for casting values of one type to another, with lossy truncation.
 pub trait CastLossy<T: Sized = Self> {
@@ -41,6 +42,7 @@ impl<N: Network> Literal<N> {
     ///  - (`Address`, `Group`) <-> `Field` <-> `Scalar` <-> `Integer` <-> `Boolean`
     ///  - `Signature` (not supported)
     ///  - `String` (not supported)
+    ///
     /// Note that casting to left along the hierarchy always preserves information.
     pub fn cast_lossy(&self, to_type: LiteralType) -> Result<Self> {
         match self {
@@ -114,10 +116,7 @@ fn cast_lossy_group_to_type<N: Network>(input: &Group<N>, to_type: LiteralType) 
 }
 
 /// Casts an integer literal to the given literal type, with lossy truncation.
-fn cast_lossy_integer_to_type<N: Network, I: IntegerType>(
-    input: &Integer<N, I>,
-    to_type: LiteralType,
-) -> Result<Literal<N>>
+fn cast_lossy_integer_to_type<N: Network, I>(input: &Integer<N, I>, to_type: LiteralType) -> Result<Literal<N>>
 where
     I: AsPrimitive<u8>
         + AsPrimitive<u16>
@@ -128,7 +127,8 @@ where
         + AsPrimitive<i16>
         + AsPrimitive<i32>
         + AsPrimitive<i64>
-        + AsPrimitive<i128>,
+        + AsPrimitive<i128>
+        + IntegerType,
 {
     impl_cast_lossy_body!(integer, cast_lossy, input, to_type)
 }

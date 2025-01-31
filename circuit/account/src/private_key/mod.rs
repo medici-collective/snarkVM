@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -20,7 +21,7 @@ use snarkvm_circuit_types::environment::assert_scope;
 
 use crate::{ComputeKey, ViewKey};
 use snarkvm_circuit_network::Aleo;
-use snarkvm_circuit_types::{environment::prelude::*, Scalar};
+use snarkvm_circuit_types::{Scalar, environment::prelude::*};
 
 pub struct PrivateKey<A: Aleo> {
     /// The signature secret key.
@@ -29,7 +30,7 @@ pub struct PrivateKey<A: Aleo> {
     r_sig: Scalar<A>,
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Inject for PrivateKey<A> {
     type Primitive = console::PrivateKey<A::Network>;
 
@@ -51,7 +52,7 @@ impl<A: Aleo> PrivateKey<A> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<A: Aleo> Eject for PrivateKey<A> {
     type Primitive = (console::Scalar<A::Network>, console::Scalar<A::Network>);
 
@@ -66,10 +67,10 @@ impl<A: Aleo> Eject for PrivateKey<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
-    use crate::{helpers::generate_account, Circuit};
+    use crate::{Circuit, helpers::generate_account};
 
     use anyhow::Result;
 

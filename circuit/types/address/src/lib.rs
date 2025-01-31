@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -47,7 +48,7 @@ impl<E: Environment> Address<E> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment> Inject for Address<E> {
     type Primitive = console::Address<E::Network>;
 
@@ -57,7 +58,7 @@ impl<E: Environment> Inject for Address<E> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment> Eject for Address<E> {
     type Primitive = console::Address<E::Network>;
 
@@ -72,7 +73,7 @@ impl<E: Environment> Eject for Address<E> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment> Parser for Address<E> {
     /// Parses a string into an address circuit.
     #[inline]
@@ -89,7 +90,7 @@ impl<E: Environment> Parser for Address<E> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment> FromStr for Address<E> {
     type Err = Error;
 
@@ -108,7 +109,7 @@ impl<E: Environment> FromStr for Address<E> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment> TypeName for Address<E> {
     /// Returns the type name of the circuit as a string.
     #[inline]
@@ -117,14 +118,14 @@ impl<E: Environment> TypeName for Address<E> {
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment> Debug for Address<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Display::fmt(self, f)
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment> Display for Address<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}.{}", self.eject_value(), self.eject_mode())
@@ -143,7 +144,7 @@ impl<E: Environment> From<&Address<E>> for LinearCombination<E::BaseField> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
     use snarkvm_circuit_environment::Circuit;

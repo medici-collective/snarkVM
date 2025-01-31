@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -127,8 +128,8 @@ pub fn split_candidate_solutions<T, F>(
     verification_fn: F,
 ) -> (Vec<T>, Vec<T>)
 where
-    T: Sized,
-    F: Fn(&T) -> bool,
+    T: Sized + Copy,
+    F: Fn(&mut T) -> bool,
 {
     // Separate the candidate solutions into valid and aborted solutions.
     let mut valid_candidate_solutions = Vec::with_capacity(max_solutions);
@@ -147,32 +148,35 @@ where
         }
 
         // Split off a chunk of the candidate solutions.
-        let candidates_chunk = if candidate_solutions.len() > chunk_size {
+        let mut candidates_chunk = if candidate_solutions.len() > chunk_size {
             candidate_solutions.split_off(candidate_solutions.len() - chunk_size)
         } else {
             std::mem::take(&mut candidate_solutions)
         };
 
         // Verify the solutions in the chunk.
-        let verification_results: Vec<_> = candidates_chunk
-            .into_iter()
-            .rev()
-            .map(|solution| {
-                let verified = verification_fn(&solution);
-                (solution, verified)
-            })
-            .collect();
+        let verification_results = candidates_chunk.iter_mut().rev().map(|solution| {
+            let verified = verification_fn(solution);
+            (solution, verified)
+        });
 
         // Process the results of the verification.
         for (solution, is_valid) in verification_results.into_iter() {
             if is_valid && valid_candidate_solutions.len() < max_solutions {
-                valid_candidate_solutions.push(solution);
+                valid_candidate_solutions.push(*solution);
             } else {
-                aborted_candidate_solutions.push(solution);
+                aborted_candidate_solutions.push(*solution);
             }
         }
     }
 
+    // The `aborted_candidate_solutions` can contain both verified and unverified solutions.
+    // When `check_solution_mut` is used as `verification_fn`, these aborted solutions
+    // may include both mutated and un-mutated variants. This occurs because the verification
+    // check is skipped once the `max_solutions` limit is reached.
+    //
+    // This approach is SAFE because currently, only the `solutionID` of aborted solutions is stored.
+    // However, if full aborted solutions need to be stored in the future, this logic will need to be revisited.
     (valid_candidate_solutions, aborted_candidate_solutions)
 }
 
@@ -201,7 +205,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
                 // Separate the candidate solutions into valid and aborted solutions.
                 let (valid_candidate_solutions, aborted_candidate_solutions) =
                     split_candidate_solutions(candidate_solutions, N::MAX_SOLUTIONS, |solution| {
-                        self.puzzle().check_solution(solution, latest_epoch_hash, latest_proof_target).is_ok()
+                        self.puzzle().check_solution_mut(solution, latest_epoch_hash, latest_proof_target).is_ok()
                     });
 
                 // Check if there are any valid solutions.
@@ -291,9 +295,12 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         )?;
 
         // Calculate the coinbase reward.
-        let coinbase_reward = coinbase_reward(
+        let coinbase_reward = coinbase_reward::<N>(
             next_height,
+            next_timestamp,
+            N::GENESIS_TIMESTAMP,
             N::STARTING_SUPPLY,
+            N::ANCHOR_TIME,
             N::ANCHOR_HEIGHT,
             N::BLOCK_TIME,
             combined_proof_target,
@@ -312,6 +319,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // Speculate over the ratifications, solutions, and transactions.
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = self.vm.speculate(
             state,
+            next_timestamp.saturating_sub(previous_block.timestamp()),
             Some(coinbase_reward),
             candidate_ratifications,
             &solutions,

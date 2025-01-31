@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -20,13 +21,14 @@ mod size_in_bytes;
 
 use snarkvm_console_account::Signature;
 use snarkvm_console_network::prelude::*;
-use snarkvm_console_types::{prelude::*, Boolean};
+use snarkvm_console_types::{Boolean, prelude::*};
 
 use core::fmt::{self, Debug, Display};
+use enum_iterator::Sequence;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, FromPrimitive)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, FromPrimitive, Sequence)]
 pub enum LiteralType {
     /// The Aleo address type.
     Address,
@@ -66,7 +68,7 @@ pub enum LiteralType {
 
 impl LiteralType {
     /// Returns the literal type name.
-    pub fn type_name(&self) -> &str {
+    pub const fn type_name(&self) -> &str {
         match self {
             Self::Address => "address",
             Self::Boolean => "boolean",

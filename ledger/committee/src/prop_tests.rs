@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -18,8 +19,8 @@ use console::account::PrivateKey;
 
 use anyhow::Result;
 use proptest::{
-    collection::{hash_set, SizeRange},
-    prelude::{any, Arbitrary, BoxedStrategy, Just, Strategy},
+    collection::{SizeRange, hash_set},
+    prelude::{Arbitrary, BoxedStrategy, Just, Strategy, any},
     sample::size_range,
 };
 use rand::SeedableRng;
@@ -186,7 +187,7 @@ fn committee_members(input: CommitteeContext) {
     }
     let quorum_threshold = committee.quorum_threshold();
     let availability_threshold = committee.availability_threshold();
-    // (2f + 1) + (f + 1) - 1 = 3f + 1 = N
+    // (N - f) + (f + 1) - 1 = N
     assert_eq!(quorum_threshold + availability_threshold - 1, total_stake);
 }
 

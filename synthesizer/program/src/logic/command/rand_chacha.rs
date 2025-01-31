@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,15 +14,15 @@
 // limitations under the License.
 
 use crate::{
-    traits::{RegistersLoad, RegistersStore, StackMatches, StackProgram},
     FinalizeRegistersState,
     Opcode,
     Operand,
+    traits::{RegistersLoad, RegistersStore, StackMatches, StackProgram},
 };
 use console::{
     network::prelude::*,
     program::{Literal, LiteralType, Plaintext, Register, Value},
-    types::{Address, Boolean, Field, Group, Scalar, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8},
+    types::{Address, Boolean, Field, Group, I8, I16, I32, I64, I128, Scalar, U8, U16, U32, U64, U128},
 };
 
 use rand::SeedableRng;
@@ -88,15 +89,29 @@ impl<N: Network> RandChaCha<N> {
         let seeds: Vec<_> = self.operands.iter().map(|operand| registers.load(stack, operand)).try_collect()?;
 
         // Construct the random seed.
-        let preimage = to_bits_le![
-            registers.state().random_seed(),
-            **registers.transition_id(),
-            stack.program_id(),
-            registers.function_name(),
-            self.destination.locator(),
-            self.destination_type.type_id(),
-            seeds
-        ];
+        // If the height is greater than or equal to `CONSENSUS_V3_HEIGHT`, then use the new preimage definition.
+        // The difference is that a nonce is also included in the new definition.
+        let preimage = match registers.state().block_height() < N::CONSENSUS_V3_HEIGHT {
+            true => to_bits_le![
+                registers.state().random_seed(),
+                **registers.transition_id(),
+                stack.program_id(),
+                registers.function_name(),
+                self.destination.locator(),
+                self.destination_type.type_id(),
+                seeds
+            ],
+            false => to_bits_le![
+                registers.state().random_seed(),
+                **registers.transition_id(),
+                stack.program_id(),
+                registers.function_name(),
+                registers.nonce(),
+                self.destination.locator(),
+                self.destination_type.type_id(),
+                seeds
+            ],
+        };
 
         // Hash the preimage.
         let digest = N::hash_bhp1024(&preimage)?.to_bytes_le()?;

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -19,7 +20,7 @@ mod scalar;
 
 use crate::{Literal, LiteralType};
 use snarkvm_console_network::Network;
-use snarkvm_console_types::{integers::Integer, prelude::*, Boolean};
+use snarkvm_console_types::{Boolean, integers::Integer, prelude::*};
 
 /// Unary operator for casting values of one type to another.
 pub trait Cast<T: Sized = Self> {
@@ -40,6 +41,7 @@ impl<N: Network> Literal<N> {
     ///  - (`Address`, `Group`) <-> `Field` <-> `Scalar` <-> `Integer` <-> `Boolean`
     ///  - `Signature` (not supported)
     ///  - `String` (not supported)
+    ///
     /// Note that casting to left along the hierarchy always preserves information.
     pub fn cast(&self, to_type: LiteralType) -> Result<Self> {
         match self {

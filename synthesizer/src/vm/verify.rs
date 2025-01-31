@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -131,11 +132,15 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
 
         lap!(timer, "Check for duplicate elements");
 
-        // First, verify the fee.
-        self.check_fee(transaction, rejected_id)?;
+        // Construct the transaction checksum.
+        let checksum = Data::<Transaction<N>>::Buffer(transaction.to_bytes_le()?.into()).to_checksum::<N>()?;
 
         // Check if the transaction exists in the partially-verified cache.
-        let is_partially_verified = self.partially_verified_transactions.read().peek(&transaction.id()).is_some();
+        let is_partially_verified =
+            self.partially_verified_transactions.read().peek(&(transaction.id())) == Some(&checksum);
+
+        // Verify the fee.
+        self.check_fee(transaction, rejected_id, is_partially_verified)?;
 
         // Next, verify the deployment or execution.
         match transaction {
@@ -188,7 +193,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
         // If the above checks have passed and this is not a fee transaction,
         // then add the transaction ID to the partially-verified transactions cache.
         if !matches!(transaction, Transaction::Fee(..)) && !is_partially_verified {
-            self.partially_verified_transactions.write().push(transaction.id(), ());
+            self.partially_verified_transactions.write().push(transaction.id(), checksum);
         }
 
         finish!(timer, "Verify the transaction");
@@ -197,7 +202,12 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
 
     /// Verifies the `fee` in the given transaction. On failure, returns an error.
     #[inline]
-    pub fn check_fee(&self, transaction: &Transaction<N>, rejected_id: Option<Field<N>>) -> Result<()> {
+    pub fn check_fee(
+        &self,
+        transaction: &Transaction<N>,
+        rejected_id: Option<Field<N>>,
+        is_partially_verified: bool,
+    ) -> Result<()> {
         match transaction {
             Transaction::Deploy(id, _, deployment, fee) => {
                 // Ensure the rejected ID is not present.
@@ -213,7 +223,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
                     bail!("Transaction '{id}' has an insufficient base fee (deployment) - requires {cost} microcredits")
                 }
                 // Verify the fee.
-                self.check_fee_internal(fee, deployment_id)?;
+                self.check_fee_internal(fee, deployment_id, is_partially_verified)?;
             }
             Transaction::Execute(id, execution, fee) => {
                 // Ensure the rejected ID is not present.
@@ -228,8 +238,15 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
                 if let Some(fee) = fee {
                     // If the fee is required, then check that the base fee amount is satisfied.
                     if is_fee_required {
-                        // Compute the execution cost.
-                        let (cost, _) = execution_cost(&self.process().read(), execution)?;
+                        // Compute the execution cost based on the block height
+                        let block_height = self
+                            .block_store()
+                            .find_block_height_from_state_root(execution.global_state_root())?
+                            .unwrap_or_default();
+                        let (cost, (_, _)) = match block_height < N::CONSENSUS_V2_HEIGHT {
+                            true => execution_cost_v1(&self.process().read(), execution)?,
+                            false => execution_cost_v2(&self.process().read(), execution)?,
+                        };
                         // Ensure the fee is sufficient to cover the cost.
                         if *fee.base_amount()? < cost {
                             bail!(
@@ -241,7 +258,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
                         ensure!(*fee.base_amount()? == 0, "Transaction '{id}' has a non-zero base fee (execution)");
                     }
                     // Verify the fee.
-                    self.check_fee_internal(fee, execution_id)?;
+                    self.check_fee_internal(fee, execution_id, is_partially_verified)?;
                 } else {
                     // Ensure the fee can be safely skipped.
                     ensure!(!is_fee_required, "Transaction '{id}' is missing a fee (execution)");
@@ -253,7 +270,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
             Transaction::Fee(id, fee) => {
                 // Verify the fee.
                 match rejected_id {
-                    Some(rejected_id) => self.check_fee_internal(fee, rejected_id)?,
+                    Some(rejected_id) => self.check_fee_internal(fee, rejected_id, is_partially_verified)?,
                     None => bail!("Transaction '{id}' is missing a rejected ID (fee)"),
                 }
             }
@@ -293,6 +310,14 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
     fn check_execution_internal(&self, execution: &Execution<N>, is_partially_verified: bool) -> Result<()> {
         let timer = timer!("VM::check_execution");
 
+        // Retrieve the block height.
+        let block_height = self.block_store().current_block_height();
+
+        // Ensure the execution does not contain any restricted transitions.
+        if self.restrictions.contains_restricted_transitions(execution, block_height) {
+            bail!("Execution verification failed - restricted transition found");
+        }
+
         // Verify the execution proof, if it has not been partially-verified before.
         let verification = match is_partially_verified {
             true => Ok(()),
@@ -319,15 +344,23 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
     /// Note: This is an internal check only. To ensure all components of the fee are checked,
     /// use `VM::check_fee` instead.
     #[inline]
-    fn check_fee_internal(&self, fee: &Fee<N>, deployment_or_execution_id: Field<N>) -> Result<()> {
+    fn check_fee_internal(
+        &self,
+        fee: &Fee<N>,
+        deployment_or_execution_id: Field<N>,
+        is_partially_verified: bool,
+    ) -> Result<()> {
         let timer = timer!("VM::check_fee");
 
         // Ensure the fee does not exceed the limit.
         let fee_amount = fee.amount()?;
         ensure!(*fee_amount <= N::MAX_FEE, "Fee verification failed: fee exceeds the maximum limit");
 
-        // Verify the fee.
-        let verification = self.process.read().verify_fee(fee, deployment_or_execution_id);
+        // Verify the fee, if it has not been partially-verified before.
+        let verification = match is_partially_verified {
+            true => Ok(()),
+            false => self.process.read().verify_fee(fee, deployment_or_execution_id),
+        };
         lap!(timer, "Verify the fee");
 
         // TODO (howardwu): This check is technically insufficient. Consider moving this upstream
@@ -375,7 +408,7 @@ mod tests {
         account::{Address, ViewKey},
         types::Field,
     };
-    use ledger_block::{Block, Header, Metadata, Transaction};
+    use ledger_block::{Block, Header, Metadata, Transaction, Transition};
 
     type CurrentNetwork = test_helpers::CurrentNetwork;
 
@@ -388,16 +421,22 @@ mod tests {
         let deployment_transaction = crate::vm::test_helpers::sample_deployment_transaction(rng);
         // Ensure the transaction verifies.
         vm.check_transaction(&deployment_transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&deployment_transaction.id()).is_some());
 
         // Fetch an execution transaction.
         let execution_transaction = crate::vm::test_helpers::sample_execution_transaction_with_private_fee(rng);
         // Ensure the transaction verifies.
         vm.check_transaction(&execution_transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&execution_transaction.id()).is_some());
 
         // Fetch an execution transaction.
         let execution_transaction = crate::vm::test_helpers::sample_execution_transaction_with_public_fee(rng);
         // Ensure the transaction verifies.
         vm.check_transaction(&execution_transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&execution_transaction.id()).is_some());
     }
 
     #[test]
@@ -413,11 +452,15 @@ mod tests {
 
         // Ensure the deployment is valid.
         vm.check_deployment_internal(&deployment, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is not updated.
+        assert!(vm.partially_verified_transactions.read().peek(&deployment.to_deployment_id().unwrap()).is_none());
 
         // Ensure that deserialization doesn't break the transaction verification.
         let serialized_deployment = deployment.to_string();
         let deployment_transaction: Deployment<CurrentNetwork> = serde_json::from_str(&serialized_deployment).unwrap();
         vm.check_deployment_internal(&deployment_transaction, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is not updated.
+        assert!(vm.partially_verified_transactions.read().peek(&deployment.to_deployment_id().unwrap()).is_none());
     }
 
     #[test]
@@ -438,12 +481,23 @@ mod tests {
                     assert!(execution.proof().is_some());
                     // Verify the execution.
                     vm.check_execution_internal(&execution, false).unwrap();
+                    // Ensure the partially_verified_transactions cache is not updated.
+                    assert!(
+                        vm.partially_verified_transactions.read().peek(&execution.to_execution_id().unwrap()).is_none()
+                    );
 
                     // Ensure that deserialization doesn't break the transaction verification.
                     let serialized_execution = execution.to_string();
                     let recovered_execution: Execution<CurrentNetwork> =
                         serde_json::from_str(&serialized_execution).unwrap();
                     vm.check_execution_internal(&recovered_execution, false).unwrap();
+                    // Ensure the partially_verified_transactions cache is not updated.
+                    assert!(
+                        vm.partially_verified_transactions
+                            .read()
+                            .peek(&recovered_execution.to_execution_id().unwrap())
+                            .is_none()
+                    );
                 }
                 _ => panic!("Expected an execution transaction"),
             }
@@ -469,12 +523,16 @@ mod tests {
                     // Ensure the proof exists.
                     assert!(fee.proof().is_some());
                     // Verify the fee.
-                    vm.check_fee_internal(&fee, execution_id).unwrap();
+                    vm.check_fee_internal(&fee, execution_id, false).unwrap();
+                    // Ensure the partially_verified_transactions cache is not updated.
+                    assert!(vm.partially_verified_transactions.read().peek(&execution_id).is_none());
 
                     // Ensure that deserialization doesn't break the transaction verification.
                     let serialized_fee = fee.to_string();
                     let recovered_fee: Fee<CurrentNetwork> = serde_json::from_str(&serialized_fee).unwrap();
-                    vm.check_fee_internal(&recovered_fee, execution_id).unwrap();
+                    vm.check_fee_internal(&recovered_fee, execution_id, false).unwrap();
+                    // Ensure the partially_verified_transactions cache is not updated.
+                    assert!(vm.partially_verified_transactions.read().peek(&execution_id).is_none());
                 }
                 _ => panic!("Expected an execution with a fee"),
             }
@@ -495,14 +553,20 @@ mod tests {
         // Fetch a valid execution transaction with a private fee.
         let valid_transaction = crate::vm::test_helpers::sample_execution_transaction_with_private_fee(rng);
         vm.check_transaction(&valid_transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&valid_transaction.id()).is_some());
 
         // Fetch a valid execution transaction with a public fee.
         let valid_transaction = crate::vm::test_helpers::sample_execution_transaction_with_public_fee(rng);
         vm.check_transaction(&valid_transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&valid_transaction.id()).is_some());
 
-        // Fetch an valid execution transaction with no fee.
+        // Fetch a valid execution transaction with no fee.
         let valid_transaction = crate::vm::test_helpers::sample_execution_transaction_without_fee(rng);
         vm.check_transaction(&valid_transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&valid_transaction.id()).is_some());
     }
 
     #[test]
@@ -534,8 +598,17 @@ mod tests {
         let deployment_transaction = vm.deploy(&caller_private_key, &program, Some(credits), 10, None, rng).unwrap();
 
         // Construct the new block header.
+        let time_since_last_block = CurrentNetwork::BLOCK_TIME as i64;
         let (ratifications, transactions, aborted_transaction_ids, ratified_finalize_operations) = vm
-            .speculate(sample_finalize_state(1), Some(0u64), vec![], &None.into(), [deployment_transaction].iter(), rng)
+            .speculate(
+                sample_finalize_state(1),
+                time_since_last_block,
+                Some(0u64),
+                vec![],
+                &None.into(),
+                [deployment_transaction].iter(),
+                rng,
+            )
             .unwrap();
         assert!(aborted_transaction_ids.is_empty());
 
@@ -550,7 +623,7 @@ mod tests {
             CurrentNetwork::GENESIS_PROOF_TARGET,
             genesis.last_coinbase_target(),
             genesis.last_coinbase_timestamp(),
-            CurrentNetwork::GENESIS_TIMESTAMP + 1,
+            genesis.timestamp().saturating_add(time_since_last_block),
         )
         .unwrap();
 
@@ -601,6 +674,8 @@ mod tests {
 
         // Verify.
         vm.check_transaction(&transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&transaction.id()).is_some());
     }
 
     #[test]
@@ -632,5 +707,175 @@ function compute:
 
         // Ensure that the program can't be deployed.
         assert!(vm.deploy_raw(&program, rng).is_err());
+    }
+
+    #[test]
+    fn test_check_mutated_execution() {
+        let rng = &mut TestRng::default();
+
+        // Initialize the VM.
+        let vm = crate::vm::test_helpers::sample_vm();
+        // Fetch the caller's private key.
+        let caller_private_key = crate::vm::test_helpers::sample_genesis_private_key(rng);
+        // Initialize the genesis block.
+        let genesis = crate::vm::test_helpers::sample_genesis_block(rng);
+        // Update the VM.
+        vm.add_next_block(&genesis).unwrap();
+
+        // Fetch a valid execution transaction with a public fee.
+        let valid_transaction = crate::vm::test_helpers::sample_execution_transaction_with_public_fee(rng);
+        vm.check_transaction(&valid_transaction, None, rng).unwrap();
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&valid_transaction.id()).is_some());
+
+        // Mutate the execution transaction by inserting a Field::Zero as an output.
+        let execution = valid_transaction.execution().unwrap();
+
+        // Extract the first transition from the execution.
+        let transitions: Vec<_> = execution.transitions().collect();
+        assert_eq!(transitions.len(), 1);
+        let transition = transitions[0].clone();
+
+        // Mutate the transition by adding an additional `Field::zero` output. This is significant because the Varuna
+        // verifier pads the inputs with `Field::zero`s, which means that the same proof is valid for both the
+        // original and the mutated executions.
+        let added_output = Output::ExternalRecord(Field::zero());
+        let mutated_outputs = [transition.outputs(), &[added_output]].concat();
+        let mutated_transition = Transition::new(
+            *transition.program_id(),
+            *transition.function_name(),
+            transition.inputs().to_vec(),
+            mutated_outputs,
+            *transition.tpk(),
+            *transition.tcm(),
+            *transition.scm(),
+        )
+        .unwrap();
+
+        // Construct the mutated execution.
+        let mutated_execution = Execution::from(
+            [mutated_transition].into_iter(),
+            execution.global_state_root(),
+            execution.proof().cloned(),
+        )
+        .unwrap();
+
+        // Authorize the fee.
+        let authorization = vm
+            .authorize_fee_public(
+                &caller_private_key,
+                10_000_000,
+                100,
+                mutated_execution.to_execution_id().unwrap(),
+                rng,
+            )
+            .unwrap();
+        // Compute the fee.
+        let fee = vm.execute_fee_authorization(authorization, None, rng).unwrap();
+
+        // Construct the transaction.
+        let mutated_transaction = Transaction::from_execution(mutated_execution, Some(fee)).unwrap();
+
+        // Ensure that the mutated transaction fails verification due to an extra output.
+        assert!(vm.check_transaction(&mutated_transaction, None, rng).is_err());
+        // Ensure the partially_verified_transactions cache is not updated.
+        assert!(vm.partially_verified_transactions.read().peek(&mutated_transaction.id()).is_none());
+    }
+
+    #[cfg(feature = "test")]
+    #[test]
+    fn test_fee_migration() {
+        // This test will fail if the consensus v2 height is 0
+        assert_ne!(0, CurrentNetwork::CONSENSUS_V2_HEIGHT);
+
+        let minimum_credits_transfer_public_fee = 34_060;
+        let old_minimum_credits_transfer_public_fee = 51_060;
+
+        let rng = &mut TestRng::default();
+
+        // Initialize the VM.
+        let vm = crate::vm::test_helpers::sample_vm();
+        // Initialize the genesis block.
+        let genesis = crate::vm::test_helpers::sample_genesis_block(rng);
+        // Update the VM.
+        vm.add_next_block(&genesis).unwrap();
+
+        // Create the base transaction
+        let transaction = crate::vm::test_helpers::sample_execution_transaction_with_public_fee(rng);
+
+        // Try to submit a tx with the new fee before the migration block height
+        let fee_too_low_transaction = crate::vm::test_helpers::create_new_transaction_with_different_fee(
+            rng,
+            transaction.clone(),
+            minimum_credits_transfer_public_fee,
+        );
+        assert!(vm.check_transaction(&fee_too_low_transaction, None, rng).is_err());
+        // Ensure the partially_verified_transactions cache is not updated.
+        assert!(vm.partially_verified_transactions.read().peek(&fee_too_low_transaction.id()).is_none());
+
+        // Try to submit a tx with the old fee before the migration block height
+        let old_valid_transaction = crate::vm::test_helpers::create_new_transaction_with_different_fee(
+            rng,
+            transaction.clone(),
+            old_minimum_credits_transfer_public_fee,
+        );
+        assert!(vm.check_transaction(&old_valid_transaction, None, rng).is_ok());
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&old_valid_transaction.id()).is_some());
+
+        // Update the VM to the migration block height
+        let private_key = test_helpers::sample_genesis_private_key(rng);
+        let transactions: [Transaction<CurrentNetwork>; 0] = [];
+        for _ in 0..CurrentNetwork::CONSENSUS_V2_HEIGHT {
+            // Call the function
+            let next_block = crate::vm::test_helpers::sample_next_block(&vm, &private_key, &transactions, rng).unwrap();
+            vm.add_next_block(&next_block).unwrap();
+        }
+
+        // Create a new transaction with the new stateroot post migration block height
+        let transaction = {
+            let address = Address::try_from(&private_key).unwrap();
+            let inputs = [
+                Value::<CurrentNetwork>::from_str(&address.to_string()).unwrap(),
+                Value::<CurrentNetwork>::from_str("1u64").unwrap(),
+            ]
+            .into_iter();
+
+            // Execute.
+            let transaction_without_fee =
+                vm.execute(&private_key, ("credits.aleo", "transfer_public"), inputs, None, 0, None, rng).unwrap();
+            let execution = transaction_without_fee.execution().unwrap().clone();
+
+            // Authorize the fee.
+            let authorization = vm
+                .authorize_fee_public(&private_key, 10_000_000, 100, execution.to_execution_id().unwrap(), rng)
+                .unwrap();
+            // Compute the fee.
+            let fee = vm.execute_fee_authorization(authorization, None, rng).unwrap();
+
+            // Construct the transaction.
+            Transaction::from_execution(execution, Some(fee)).unwrap()
+        };
+
+        // Try to submit a tx with the old fee after the migration block height
+        // Should work as now the fee is just too high
+        let fee_too_high_transaction = crate::vm::test_helpers::create_new_transaction_with_different_fee(
+            rng,
+            transaction.clone(),
+            old_minimum_credits_transfer_public_fee,
+        );
+        assert!(vm.check_transaction(&fee_too_high_transaction, None, rng).is_ok());
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&fee_too_high_transaction.id()).is_some());
+
+        // Try to submit a tx with the new fee after the migration block height
+        let valid_transaction = crate::vm::test_helpers::create_new_transaction_with_different_fee(
+            rng,
+            transaction.clone(),
+            minimum_credits_transfer_public_fee,
+        );
+        assert!(vm.check_transaction(&valid_transaction, None, rng).is_ok());
+        // Ensure the partially_verified_transactions cache is updated.
+        assert!(vm.partially_verified_transactions.read().peek(&valid_transaction.id()).is_some());
     }
 }

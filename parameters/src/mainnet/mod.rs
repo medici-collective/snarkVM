@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -18,16 +19,16 @@ pub use genesis::*;
 pub mod powers;
 pub use powers::*;
 
-const REMOTE_URL: &str = "https://s3-us-west-1.amazonaws.com/mainnet.parameters";
+/// The restrictions list as a JSON-compatible string.
+pub const RESTRICTIONS_LIST: &str = include_str!("./resources/restrictions.json");
+
+const REMOTE_URL: &str = "https://parameters.aleo.org/mainnet";
 
 // Degrees
 #[cfg(not(feature = "wasm"))]
 impl_local!(Degree15, "resources/", "powers-of-beta-15", "usrs");
 #[cfg(feature = "wasm")]
 impl_remote!(Degree15, REMOTE_URL, "resources/", "powers-of-beta-15", "usrs");
-#[cfg(not(feature = "wasm"))]
-impl_local!(Degree16, "resources/", "powers-of-beta-16", "usrs");
-#[cfg(feature = "wasm")]
 impl_remote!(Degree16, REMOTE_URL, "resources/", "powers-of-beta-16", "usrs");
 impl_remote!(Degree17, REMOTE_URL, "resources/", "powers-of-beta-17", "usrs");
 impl_remote!(Degree18, REMOTE_URL, "resources/", "powers-of-beta-18", "usrs");
@@ -40,7 +41,12 @@ impl_remote!(Degree24, REMOTE_URL, "resources/", "powers-of-beta-24", "usrs");
 impl_remote!(Degree25, REMOTE_URL, "resources/", "powers-of-beta-25", "usrs");
 impl_remote!(Degree26, REMOTE_URL, "resources/", "powers-of-beta-26", "usrs");
 impl_remote!(Degree27, REMOTE_URL, "resources/", "powers-of-beta-27", "usrs");
-impl_remote!(Degree28, REMOTE_URL, "resources/", "powers-of-beta-28", "usrs");
+// TODO (nkls): restore on CI.
+// The SRS is only used for proving and we don't currently support provers of
+// this size. When a users wants to create a proof, they load the appropriate
+// powers for the circuit in `batch_circuit_setup` which calls `max_degree`
+// based on the domain size.
+// impl_remote!(Degree28, REMOTE_URL, "resources/", "powers-of-beta-28", "usrs");
 
 // Shifted Degrees
 #[cfg(not(feature = "wasm"))]
@@ -61,7 +67,9 @@ impl_remote!(ShiftedDegree23, REMOTE_URL, "resources/", "shifted-powers-of-beta-
 impl_remote!(ShiftedDegree24, REMOTE_URL, "resources/", "shifted-powers-of-beta-24", "usrs");
 impl_remote!(ShiftedDegree25, REMOTE_URL, "resources/", "shifted-powers-of-beta-25", "usrs");
 impl_remote!(ShiftedDegree26, REMOTE_URL, "resources/", "shifted-powers-of-beta-26", "usrs");
-impl_remote!(ShiftedDegree27, REMOTE_URL, "resources/", "shifted-powers-of-beta-27", "usrs");
+// TODO (nkls): restore on CI.
+// See `Degree28` above for context.
+// impl_remote!(ShiftedDegree27, REMOTE_URL, "resources/", "shifted-powers-of-beta-27", "usrs");
 
 // Powers of Beta Times Gamma * G
 impl_local!(Gamma, "resources/", "powers-of-beta-gamma", "usrs");
@@ -167,6 +175,17 @@ mod tests {
     use super::*;
     use wasm_bindgen_test::*;
     wasm_bindgen_test_configure!(run_in_browser);
+
+    #[ignore]
+    #[test]
+    fn test_load_bytes_mini() {
+        Degree16::load_bytes().expect("Failed to load degree 16");
+        BondPublicVerifier::load_bytes().expect("Failed to load bond_public verifier");
+        FeePublicProver::load_bytes().expect("Failed to load fee_public prover");
+        FeePublicVerifier::load_bytes().expect("Failed to load fee_public verifier");
+        InclusionProver::load_bytes().expect("Failed to load inclusion prover");
+        InclusionVerifier::load_bytes().expect("Failed to load inclusion verifier");
+    }
 
     #[wasm_bindgen_test]
     fn test_load_bytes() {

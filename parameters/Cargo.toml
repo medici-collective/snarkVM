@@ -1,10 +1,10 @@
 [package]
 name = "snarkvm-parameters"
-version = "0.16.19"
+version = "1.2.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Parameters for a decentralized virtual machine"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkVM"
+repository = "https://github.com/ProvableHQ/snarkVM"
 keywords = [
   "aleo",
   "cryptography",
@@ -31,12 +31,12 @@ wasm = [ "encoding", "js-sys", "web-sys" ]
 
 [dependencies.snarkvm-curves]
 path = "../curves"
-version = "=0.16.19"
+version = "=1.2.1"
 default-features = false
 
 [dependencies.snarkvm-utilities]
 path = "../utilities"
-version = "=0.16.19"
+version = "=1.2.1"
 
 [dependencies.aleo-std]
 version = "0.1.24"
@@ -114,6 +114,9 @@ path = "../circuit"
 
 [dev-dependencies.snarkvm-console]
 path = "../console"
+
+[dev-dependencies.snarkvm-ledger-block]
+path = "../ledger/block"
 
 [dev-dependencies.snarkvm-ledger-store]
 path = "../ledger/store"

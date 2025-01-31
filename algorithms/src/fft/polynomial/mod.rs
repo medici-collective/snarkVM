@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,11 +16,11 @@
 //! Work with sparse and dense polynomials.
 
 use crate::fft::{EvaluationDomain, Evaluations};
-use snarkvm_fields::{Field, PrimeField};
-use snarkvm_utilities::{cfg_iter_mut, serialize::*, SerializationError};
 use Polynomial::*;
+use snarkvm_fields::{Field, PrimeField};
+use snarkvm_utilities::{SerializationError, cfg_iter_mut, serialize::*};
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use std::{borrow::Cow, convert::TryInto};
 
 #[cfg(not(feature = "serial"))]

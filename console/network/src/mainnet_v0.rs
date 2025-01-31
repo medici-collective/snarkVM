@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,22 +15,22 @@
 
 use super::*;
 use snarkvm_console_algorithms::{
+    BHP256,
+    BHP512,
+    BHP768,
+    BHP1024,
     Blake2Xs,
     Keccak256,
     Keccak384,
     Keccak512,
-    Pedersen128,
     Pedersen64,
+    Pedersen128,
     Poseidon2,
     Poseidon4,
     Poseidon8,
     Sha3_256,
     Sha3_384,
     Sha3_512,
-    BHP1024,
-    BHP256,
-    BHP512,
-    BHP768,
 };
 
 lazy_static! {
@@ -130,23 +131,59 @@ impl Network for MainnetV0 {
     type TransactionID = AleoID<Field<Self>, { hrp2!(TRANSACTION_PREFIX) }>;
     /// The transition ID type.
     type TransitionID = AleoID<Field<Self>, { hrp2!("au") }>;
+    /// The transmission checksum type.
+    type TransmissionChecksum = u128;
 
+    /// The block height from which consensus V2 rules apply.
+    #[cfg(not(any(test, feature = "test")))]
+    const CONSENSUS_V2_HEIGHT: u32 = 2_800_000;
+    /// The block height from which consensus V2 rules apply.
+    #[cfg(any(test, feature = "test"))]
+    const CONSENSUS_V2_HEIGHT: u32 = 10;
+    // TODO: (raychu86): Update this value based on the desired canary height.
+    // The block height from which consensus V3 rules apply.
+    #[cfg(not(any(test, feature = "test")))]
+    const CONSENSUS_V3_HEIGHT: u32 = 4_900_000;
+    /// The block height from which consensus V3 rules apply.
+    #[cfg(any(test, feature = "test"))]
+    const CONSENSUS_V3_HEIGHT: u32 = 11;
     /// The network edition.
     const EDITION: u16 = 0;
+    /// The genesis block coinbase target.
+    #[cfg(not(feature = "test"))]
+    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 29).saturating_sub(1);
+    /// The genesis block coinbase target.
+    /// This is deliberately set to a low value (32) for testing purposes only.
+    #[cfg(feature = "test")]
+    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 5).saturating_sub(1);
+    /// The genesis block proof target.
+    #[cfg(not(feature = "test"))]
+    const GENESIS_PROOF_TARGET: u64 = 1u64 << 27;
+    /// The genesis block proof target.
+    /// This is deliberately set to a low value (8) for testing purposes only.
+    #[cfg(feature = "test")]
+    const GENESIS_PROOF_TARGET: u64 = 1u64 << 3;
     /// The fixed timestamp of the genesis block.
-    const GENESIS_TIMESTAMP: i64 = 1696118400 /* 2023-10-01 00:00:00 UTC */;
+    const GENESIS_TIMESTAMP: i64 = 1725462000 /* 2024-09-04 11:00:00 UTC */;
     /// The network ID.
     const ID: u16 = 0;
     /// The function name for the inclusion circuit.
     const INCLUSION_FUNCTION_NAME: &'static str = snarkvm_parameters::mainnet::NETWORK_INCLUSION_FUNCTION_NAME;
     /// The maximum number of certificates in a batch.
-    const MAX_CERTIFICATES: u16 = 10;
+    const MAX_CERTIFICATES: u16 = 25;
+    /// The maximum number of certificates in a batch before consensus V3 rules apply.
+    const MAX_CERTIFICATES_BEFORE_V3: u16 = 16;
     /// The network name.
     const NAME: &'static str = "Aleo Mainnet (v0)";
 
     /// Returns the genesis block bytes.
     fn genesis_bytes() -> &'static [u8] {
         snarkvm_parameters::mainnet::GenesisBytes::load_bytes()
+    }
+
+    /// Returns the restrictions list as a JSON-compatible string.
+    fn restrictions_list_as_str() -> &'static str {
+        snarkvm_parameters::mainnet::RESTRICTIONS_LIST
     }
 
     /// Returns the proving key for the given function name in `credits.aleo`.

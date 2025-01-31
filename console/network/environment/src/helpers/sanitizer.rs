@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -12,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{string_parser::is_char_supported, ParserResult};
+use crate::{ParserResult, string_parser::is_char_supported};
 
 use nom::{
     branch::alt,
@@ -116,12 +117,36 @@ impl Sanitizer {
     ///
     /// Discard any leading newline.
     fn str_till_eol(string: &str) -> ParserResult<&str> {
-        map(
-            recognize(Self::till(alt((value((), tag("\\\n")), value((), Sanitizer::parse_safe_char))), Self::eol)),
-            |i| {
-                if i.as_bytes().last() == Some(&b'\n') { &i[0..i.len() - 1] } else { i }
-            },
-        )(string)
+        // A heuristic approach is applied here in order to avoid costly parsing operations in the
+        // most common scenarios: non-parsing methods are used to verify if the string has multiple
+        // lines and if there are any unsafe characters.
+        if let Some((before, after)) = string.split_once('\n') {
+            let is_multiline = before.ends_with('\\');
+
+            if !is_multiline {
+                let contains_unsafe_chars = !before.chars().all(is_char_supported);
+
+                if !contains_unsafe_chars {
+                    Ok((after, before))
+                } else {
+                    // `eoi` is used here instead of `eol`, since the earlier call to `split_once`
+                    // already removed the newline
+                    recognize(Self::till(value((), Sanitizer::parse_safe_char), Self::eoi))(before)
+                }
+            } else {
+                map(
+                    recognize(Self::till(
+                        alt((value((), tag("\\\n")), value((), Sanitizer::parse_safe_char))),
+                        Self::eol,
+                    )),
+                    |i| {
+                        if i.as_bytes().last() == Some(&b'\n') { &i[0..i.len() - 1] } else { i }
+                    },
+                )(string)
+            }
+        } else {
+            Ok((string, ""))
+        }
     }
 
     /// Parse a string until `*/` is encountered.
@@ -254,6 +279,23 @@ mod tests {
         assert_eq!(
             ("hello world", "// hel\u{4141}lo\n"),
             Sanitizer::parse_comments("// hel\u{4141}lo\nhello world").unwrap()
+        );
+        assert_eq!(
+            ("hello world", "/* multi\n   line comment\n*/\n"),
+            Sanitizer::parse_comments("/* multi\n   line comment\n*/\nhello world").unwrap()
+        );
+        assert_eq!(
+            ("hello world", "// multiple\n// line\n// comments\n"),
+            Sanitizer::parse_comments("// multiple\n// line\n// comments\nhello world").unwrap()
+        );
+        assert_eq!(
+            ("hello world", "/* multi\n   line comment\n*/\n/* and\n   another\n   one\n*/\n"),
+            Sanitizer::parse_comments("/* multi\n   line comment\n*/\n/* and\n   another\n   one\n*/\nhello world")
+                .unwrap()
+        );
+        assert_eq!(
+            ("hello world", "/* multi\n   line comment\n*/\n// two single\n// line comments\n/* and\n   another\n   multi-liner\n*/\n"),
+            Sanitizer::parse_comments("/* multi\n   line comment\n*/\n// two single\n// line comments\n/* and\n   another\n   multi-liner\n*/\nhello world").unwrap()
         );
         assert!(Sanitizer::parse_comments("// hel\x08lo\nhello world").is_err());
         assert!(Sanitizer::parse_comments("// hel\u{2066}lo\nhello world").is_err());

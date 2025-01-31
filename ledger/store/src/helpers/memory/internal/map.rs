@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -22,10 +23,10 @@ use core::{borrow::Borrow, hash::Hash};
 use parking_lot::{Mutex, RwLock};
 use std::{
     borrow::Cow,
-    collections::{btree_map, BTreeMap},
+    collections::{BTreeMap, btree_map},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -383,7 +384,7 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{atomic_batch_scope, atomic_finalize, FinalizeMode};
+    use crate::{FinalizeMode, atomic_batch_scope, atomic_finalize};
     use console::{account::Address, network::MainnetV0};
 
     type CurrentNetwork = MainnetV0;

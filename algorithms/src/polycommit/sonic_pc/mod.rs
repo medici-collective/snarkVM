@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,18 +14,18 @@
 // limitations under the License.
 
 use crate::{
+    AlgebraicSponge,
     fft::DensePolynomial,
     msm::variable_base::VariableBase,
-    polycommit::{kzg10, optional_rng::OptionalRng, PCError},
+    polycommit::{PCError, kzg10, optional_rng::OptionalRng},
     srs::{UniversalProver, UniversalVerifier},
-    AlgebraicSponge,
 };
 use hashbrown::HashMap;
 use itertools::Itertools;
 use snarkvm_curves::traits::{AffineCurve, PairingCurve, PairingEngine, ProjectiveCurve};
 use snarkvm_fields::{One, Zero};
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use core::{convert::TryInto, marker::PhantomData, ops::Mul};
 use rand_core::{RngCore, SeedableRng};
 use std::{
@@ -684,7 +685,7 @@ mod tests {
     use super::{CommitterKey, SonicKZG10};
     use crate::{crypto_hash::PoseidonSponge, polycommit::test_templates::*};
     use snarkvm_curves::bls12_377::{Bls12_377, Fq};
-    use snarkvm_utilities::{rand::TestRng, FromBytes, ToBytes};
+    use snarkvm_utilities::{FromBytes, ToBytes, rand::TestRng};
 
     use rand::distributions::Distribution;
 

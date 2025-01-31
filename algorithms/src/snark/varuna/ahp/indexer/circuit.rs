@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -16,24 +17,24 @@ use core::marker::PhantomData;
 
 use crate::{
     fft::{
-        domain::{FFTPrecomputation, IFFTPrecomputation},
         EvaluationDomain,
+        domain::{FFTPrecomputation, IFFTPrecomputation},
     },
     polycommit::sonic_pc::LabeledPolynomial,
     snark::varuna::{
-        ahp::matrices::MatrixEvals,
-        matrices::MatrixArithmetization,
         AHPForR1CS,
         CircuitInfo,
         Matrix,
         SNARKMode,
+        ahp::matrices::MatrixEvals,
+        matrices::MatrixArithmetization,
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use blake2::Digest;
 use hex::FromHex;
 use snarkvm_fields::PrimeField;
-use snarkvm_utilities::{serialize::*, SerializationError};
+use snarkvm_utilities::{SerializationError, serialize::*};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, CanonicalSerialize, CanonicalDeserialize)]
 pub struct CircuitId(pub [u8; 32]);
@@ -141,7 +142,7 @@ impl<F: PrimeField, SM: SNARKMode> Circuit<F, SM> {
     pub fn interpolate_matrix_evals(&self) -> Result<impl Iterator<Item = LabeledPolynomial<F>>> {
         let mut iters = Vec::with_capacity(3);
         for (label, evals) in [("a", &self.a_arith), ("b", &self.b_arith), ("c", &self.c_arith)] {
-            iters.push(MatrixArithmetization::new(&self.id, label, evals)?.into_iter());
+            iters.push(MatrixArithmetization::new::<SM>(&self.id, label, evals)?.into_iter());
         }
         Ok(iters.into_iter().flatten())
     }

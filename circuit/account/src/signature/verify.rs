@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -41,10 +42,10 @@ impl<A: Aleo> Signature<A> {
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 pub(crate) mod tests {
     use super::*;
-    use crate::{helpers::generate_account, Circuit};
+    use crate::{Circuit, helpers::generate_account};
     use snarkvm_circuit_types::Group;
     use snarkvm_utilities::{TestRng, Uniform};
 
@@ -73,7 +74,7 @@ pub(crate) mod tests {
             let signature = Signature::<Circuit>::new(mode, signature);
             let address = Address::new(mode, address);
 
-            Circuit::scope(&format!("{mode} {i}"), || {
+            Circuit::scope(format!("{mode} {i}"), || {
                 let candidate = signature.verify(&address, &message);
                 assert!(candidate.eject_value());
                 // TODO (howardwu): Resolve skipping the cost count checks for the burn-in round.
@@ -113,7 +114,7 @@ pub(crate) mod tests {
             let signature = Signature::<Circuit>::new(mode, signature);
             let address = Address::new(mode, address);
 
-            Circuit::scope(&format!("{mode} {i}"), || {
+            Circuit::scope(format!("{mode} {i}"), || {
                 let candidate = signature.verify(&address, &message);
                 assert!(candidate.eject_value());
                 // TODO (howardwu): Resolve skipping the cost count checks for the burn-in round.

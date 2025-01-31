@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,18 +15,19 @@
 
 /// From https://github.com/Geal/nom/blob/main/examples/string.rs
 pub mod string_parser {
-    //! This example shows an example of how to parse an escaped string. The
-    //! rules for the string are similar to JSON and rust. A string is:
-    //!
-    //! - Enclosed by double quotes
-    //! - Can contain any raw unescaped code point besides \ and "
-    //! - Matches the following escape sequences: \b, \f, \n, \r, \t, \", \\, \/
-    //! - Matches code points like Rust: \u{XXXX}, where XXXX can be up to 6
-    //!   hex characters
-    //! - an escape followed by whitespace consumes all whitespace between the
-    //!   escape and the next non-whitespace character
-
+    /// This example shows an example of how to parse an escaped string. The
+    /// rules for the string are similar to JSON and rust. A string is:
+    ///
+    /// - Enclosed by double quotes
+    /// - Can contain any raw unescaped code point besides \ and "
+    /// - Matches the following escape sequences: \b, \f, \n, \r, \t, \", \\, \/
+    /// - Matches code points like Rust: \u{XXXX}, where XXXX can be up to 6
+    ///   hex characters
+    /// - an escape followed by whitespace consumes all whitespace between the
+    ///   escape and the next non-whitespace character
     use nom::{
+        Err::Error,
+        IResult,
         branch::alt,
         bytes::streaming::{is_not, take_while_m_n},
         character::streaming::{char, multispace1},
@@ -33,8 +35,6 @@ pub mod string_parser {
         error::{ErrorKind, FromExternalError, ParseError},
         multi::fold_many0,
         sequence::{delimited, preceded},
-        Err::Error,
-        IResult,
     };
 
     /// Checks for supported code points.

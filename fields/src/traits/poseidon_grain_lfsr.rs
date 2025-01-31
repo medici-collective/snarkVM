@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,9 +16,9 @@
 #![allow(dead_code)]
 
 use crate::{FieldParameters, PrimeField};
-use snarkvm_utilities::{vec::Vec, FromBits};
+use snarkvm_utilities::{FromBits, vec::Vec};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 pub struct PoseidonGrainLFSR {
     pub field_size_in_bits: u64,

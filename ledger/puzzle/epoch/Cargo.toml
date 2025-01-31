@@ -1,10 +1,10 @@
 [package]
 name = "snarkvm-ledger-puzzle-epoch"
-version = "0.16.19"
+version = "1.2.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Epoch puzzle for a decentralized virtual machine"
 homepage = "https://aleo.org"
-repository = "https://github.com/AleoHQ/snarkVM"
+repository = "https://github.com/ProvableHQ/snarkVM"
 keywords = [
   "aleo",
   "cryptography",
@@ -24,22 +24,49 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = [ "merkle", "rayon" ]
-serial = [
-  "console/serial",
-  "snarkvm-ledger-puzzle/serial",
-]
+default = [ "synthesis", "rayon" ]
+serial = [ "console/serial", "snarkvm-ledger-puzzle/serial" ]
 merkle = [ ]
+synthesis = [
+  "aleo-std",
+  "circuit",
+  "lru",
+  "parking_lot",
+  "snarkvm-synthesizer-process",
+  "snarkvm-synthesizer-program"
+]
+timer = [ "aleo-std/timer" ]
 wasm = [ "console/wasm" ]
+
+[dependencies.circuit]
+package = "snarkvm-circuit"
+path = "../../../circuit"
+version = "=1.2.1"
+optional = true
 
 [dependencies.console]
 package = "snarkvm-console"
 path = "../../../console"
-version = "=0.16.19"
+version = "=1.2.1"
 
 [dependencies.snarkvm-ledger-puzzle]
 path = "../."
-version = "=0.16.19"
+version = "=1.2.1"
+
+[dependencies.snarkvm-synthesizer-process]
+path = "../../../synthesizer/process"
+version = "=1.2.1"
+optional = true
+
+[dependencies.snarkvm-synthesizer-program]
+path = "../../../synthesizer/program"
+version = "=1.2.1"
+optional = true
+
+[dependencies.aleo-std]
+version = "0.1.24"
+default-features = false
+optional = true
 
 [dependencies.anyhow]
 version = "1.0.73"
@@ -50,6 +77,14 @@ version = "2"
 [dependencies.indexmap]
 version = "2.0"
 features = [ "serde", "rayon" ]
+
+[dependencies.lru]
+version = "0.12"
+optional = true
+
+[dependencies.parking_lot]
+version = "0.12"
+optional = true
 
 [dependencies.rand]
 version = "0.8"

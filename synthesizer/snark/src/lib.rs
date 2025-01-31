@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -17,7 +18,7 @@
 #![warn(clippy::cast_possible_truncation)]
 #![cfg_attr(not(feature = "aleo-cli"), allow(unused_variables))]
 
-use console::network::{prelude::*, FiatShamir};
+use console::network::{FiatShamir, prelude::*};
 use snarkvm_algorithms::{snark::varuna, traits::SNARK};
 
 use once_cell::sync::OnceCell;
@@ -165,7 +166,7 @@ mod test {
     fn test_varuna_verify_public_input_size() {
         /// Creates a simple circuit: a * b.
         fn create_assignment() -> circuit::Assignment<<CurrentNetwork as console::prelude::Environment>::Field> {
-            use circuit::{environment::Mode, types::Field, Inject};
+            use circuit::{Inject, environment::Mode, types::Field};
 
             // Ensure the circuit environment is clean.
             Circuit::reset();

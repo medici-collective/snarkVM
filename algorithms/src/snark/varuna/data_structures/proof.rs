@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,20 +14,20 @@
 // limitations under the License.
 
 use crate::{
-    polycommit::sonic_pc,
-    snark::varuna::{ahp, CircuitId},
     SNARKError,
+    polycommit::sonic_pc,
+    snark::varuna::{CircuitId, ahp},
 };
 
 use ahp::prover::{FourthMessage, ThirdMessage};
 use snarkvm_curves::PairingEngine;
 use snarkvm_fields::PrimeField;
 use snarkvm_utilities::{
+    FromBytes,
+    ToBytes,
     error,
     io::{self, Read, Write},
     serialize::*,
-    FromBytes,
-    ToBytes,
 };
 
 use std::collections::BTreeMap;
@@ -392,8 +393,8 @@ mod test {
         snark::varuna::prover::MatrixSums,
     };
     use snarkvm_curves::{
-        bls12_377::{Bls12_377, Fr, G1Affine},
         AffineCurve,
+        bls12_377::{Bls12_377, Fr, G1Affine},
     };
     use snarkvm_utilities::{TestRng, Uniform};
 

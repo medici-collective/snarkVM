@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -16,19 +17,19 @@ use crate::Process;
 use circuit::network::AleoV0;
 use console::{
     account::{Address, PrivateKey},
-    network::{prelude::*, MainnetV0},
+    network::{MainnetV0, prelude::*},
     program::{Identifier, Literal, Plaintext, ProgramID, Value},
     types::U64,
 };
 use ledger_committee::{MIN_DELEGATOR_STAKE, MIN_VALIDATOR_SELF_STAKE, MIN_VALIDATOR_STAKE};
 use ledger_query::Query;
 use ledger_store::{
-    atomic_finalize,
-    helpers::memory::{BlockMemory, FinalizeMemory},
     BlockStore,
     FinalizeMode,
     FinalizeStorage,
     FinalizeStore,
+    atomic_finalize,
+    helpers::memory::{BlockMemory, FinalizeMemory},
 };
 use synthesizer_program::{FinalizeGlobalState, FinalizeStoreTrait, Program};
 
@@ -1692,7 +1693,7 @@ fn test_bond_validator_fails_if_unbonding_state() {
         );
         assert!(rebonding_result.is_err());
 
-        // Ensure the error wasn't due to insufficent balance
+        // Ensure the error wasn't due to insufficient balance
         let validator_balance = account_balance(&store, validator_address).unwrap();
         assert!(validator_balance > MIN_VALIDATOR_STAKE);
 

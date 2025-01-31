@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -58,7 +59,7 @@ fn run_test(process: Process<CurrentNetwork>, test: &ProgramTest) -> serde_yaml:
     for program in test.programs() {
         if let Err(err) = process.add_program(program) {
             output
-                .get_mut(&serde_yaml::Value::String("errors".to_string()))
+                .get_mut(serde_yaml::Value::String("errors".to_string()))
                 .unwrap()
                 .as_sequence_mut()
                 .unwrap()

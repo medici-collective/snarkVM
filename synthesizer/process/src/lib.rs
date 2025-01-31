@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -45,11 +46,11 @@ mod tests;
 use console::{
     account::PrivateKey,
     network::prelude::*,
-    program::{compute_function_id, Identifier, Literal, Locator, Plaintext, ProgramID, Record, Response, Value},
+    program::{Identifier, Literal, Locator, Plaintext, ProgramID, Record, Response, Value, compute_function_id},
     types::{Field, U16, U64},
 };
-use ledger_block::{Deployment, Execution, Fee, Input, Transition};
-use ledger_store::{atomic_batch_scope, FinalizeStorage, FinalizeStore};
+use ledger_block::{Deployment, Execution, Fee, Input, Output, Transition};
+use ledger_store::{FinalizeStorage, FinalizeStore, atomic_batch_scope};
 use synthesizer_program::{
     Branch,
     Closure,
@@ -288,19 +289,57 @@ impl<N: Network> Process<N> {
     }
 }
 
-#[cfg(any(test, feature = "test"))]
+#[cfg(test)]
 pub mod test_helpers {
     use super::*;
     use console::{account::PrivateKey, network::MainnetV0, program::Identifier};
     use ledger_block::Transition;
     use ledger_query::Query;
-    use ledger_store::{helpers::memory::BlockMemory, BlockStore};
+    use ledger_store::{BlockStore, helpers::memory::BlockMemory};
     use synthesizer_program::Program;
 
     use once_cell::sync::OnceCell;
 
     type CurrentNetwork = MainnetV0;
     type CurrentAleo = circuit::network::AleoV0;
+
+    /// Returns an execution for the given program and function name.
+    pub fn get_execution(
+        process: &mut Process<CurrentNetwork>,
+        program: &Program<CurrentNetwork>,
+        function_name: &Identifier<CurrentNetwork>,
+        inputs: impl ExactSizeIterator<Item = impl TryInto<Value<CurrentNetwork>>>,
+    ) -> Execution<CurrentNetwork> {
+        // Initialize a new rng.
+        let rng = &mut TestRng::default();
+
+        // Initialize a private key.
+        let private_key = PrivateKey::new(rng).unwrap();
+
+        // Add the program to the process if doesn't yet exist.
+        if !process.contains_program(program.id()) {
+            process.add_program(program).unwrap();
+        }
+
+        // Compute the authorization.
+        let authorization =
+            process.authorize::<CurrentAleo, _>(&private_key, program.id(), function_name, inputs, rng).unwrap();
+
+        // Execute the program.
+        let (_, mut trace) = process.execute::<CurrentAleo, _>(authorization, rng).unwrap();
+
+        // Initialize a new block store.
+        let block_store = BlockStore::<CurrentNetwork, BlockMemory<_>>::open(None).unwrap();
+
+        // Prepare the assignments from the block store.
+        trace.prepare(ledger_query::Query::from(block_store)).unwrap();
+
+        // Get the locator.
+        let locator = format!("{:?}:{function_name:?}", program.id());
+
+        // Return the execution object.
+        trace.prove_execution::<CurrentAleo, _>(&locator, rng).unwrap()
+    }
 
     pub fn sample_key() -> (Identifier<CurrentNetwork>, ProvingKey<CurrentNetwork>, VerifyingKey<CurrentNetwork>) {
         static INSTANCE: OnceCell<(

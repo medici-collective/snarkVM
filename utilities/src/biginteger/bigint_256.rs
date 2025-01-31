@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,21 +14,21 @@
 // limitations under the License.
 
 use crate::{
-    biginteger::BigInteger,
-    bititerator::{BitIteratorBE, BitIteratorLE},
-    io::{Read, Result as IoResult, Write},
     FromBits,
     FromBytes,
     ToBits,
     ToBytes,
+    biginteger::BigInteger,
+    bititerator::{BitIteratorBE, BitIteratorLE},
+    io::{Read, Result as IoResult, Write},
 };
 
 use anyhow::Result;
 use core::fmt::{Debug, Display};
 use num_bigint::BigUint;
 use rand::{
-    distributions::{Distribution, Standard},
     Rng,
+    distributions::{Distribution, Standard},
 };
 use zeroize::Zeroize;
 
@@ -229,12 +230,16 @@ impl crate::biginteger::BigInteger for BigInteger256 {
 impl ToBits for BigInteger256 {
     #[doc = " Returns `self` as a boolean array in little-endian order, with trailing zeros."]
     fn write_bits_le(&self, vec: &mut Vec<bool>) {
-        vec.extend(BitIteratorLE::new(self));
+        let iter = BitIteratorLE::new(self);
+        vec.reserve(iter.len());
+        vec.extend(iter);
     }
 
     #[doc = " Returns `self` as a boolean array in big-endian order, with leading zeros."]
     fn write_bits_be(&self, vec: &mut Vec<bool>) {
-        vec.extend(BitIteratorBE::new(self));
+        let iter = BitIteratorBE::new(self);
+        vec.reserve(iter.len());
+        vec.extend(iter);
     }
 }
 

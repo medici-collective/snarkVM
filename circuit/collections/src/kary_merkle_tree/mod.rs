@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -17,10 +18,10 @@ pub use helpers::{BooleanHash, LeafHash, PathHash};
 
 mod verify;
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 use snarkvm_circuit_types::environment::assert_scope;
 
-use snarkvm_circuit_types::{environment::prelude::*, Boolean, Field, U16, U64};
+use snarkvm_circuit_types::{Boolean, Field, U16, U64, environment::prelude::*};
 
 pub struct KaryMerklePath<E: Environment, PH: PathHash<E>, const DEPTH: u8, const ARITY: u8> {
     /// The leaf index for the path.
@@ -29,7 +30,7 @@ pub struct KaryMerklePath<E: Environment, PH: PathHash<E>, const DEPTH: u8, cons
     siblings: Vec<Vec<PH::Hash>>,
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment, PH: PathHash<E>, const DEPTH: u8, const ARITY: u8> Inject for KaryMerklePath<E, PH, DEPTH, ARITY> {
     type Primitive = console::kary_merkle_tree::KaryMerklePath<PH::Primitive, DEPTH, ARITY>;
 
@@ -59,7 +60,7 @@ impl<E: Environment, PH: PathHash<E>, const DEPTH: u8, const ARITY: u8> Inject f
     }
 }
 
-#[cfg(console)]
+#[cfg(feature = "console")]
 impl<E: Environment, PH: PathHash<E>, const DEPTH: u8, const ARITY: u8> Eject for KaryMerklePath<E, PH, DEPTH, ARITY> {
     type Primitive = console::kary_merkle_tree::KaryMerklePath<PH::Primitive, DEPTH, ARITY>;
 
@@ -77,11 +78,11 @@ impl<E: Environment, PH: PathHash<E>, const DEPTH: u8, const ARITY: u8> Eject fo
     }
 }
 
-#[cfg(all(test, console))]
+#[cfg(all(test, feature = "console"))]
 mod tests {
     use super::*;
     use console::{
-        algorithms::{BHP1024 as NativeBHP1024, BHP512 as NativeBHP512},
+        algorithms::{BHP512 as NativeBHP512, BHP1024 as NativeBHP1024},
         kary_merkle_tree::KaryMerkleTree,
     };
     use snarkvm_circuit_algorithms::BHP512;

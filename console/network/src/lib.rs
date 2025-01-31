@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -35,17 +36,17 @@ mod testnet_v0;
 pub use testnet_v0::*;
 
 pub mod prelude {
-    pub use crate::{environment::prelude::*, Network};
+    pub use crate::{Network, environment::prelude::*};
 }
 
 use crate::environment::prelude::*;
 use snarkvm_algorithms::{
+    AlgebraicSponge,
     crypto_hash::PoseidonSponge,
     snark::varuna::{CircuitProvingKey, CircuitVerifyingKey, VarunaHidingMode},
     srs::{UniversalProver, UniversalVerifier},
-    AlgebraicSponge,
 };
-use snarkvm_console_algorithms::{Poseidon2, Poseidon4, BHP1024, BHP512};
+use snarkvm_console_algorithms::{BHP512, BHP1024, Poseidon2, Poseidon4};
 use snarkvm_console_collections::merkle_tree::{MerklePath, MerkleTree};
 use snarkvm_console_types::{Field, Group, Scalar};
 use snarkvm_curves::PairingEngine;
@@ -90,25 +91,20 @@ pub trait Network:
     /// The network edition.
     const EDITION: u16;
 
+    /// The block height from which consensus V2 rules apply.
+    const CONSENSUS_V2_HEIGHT: u32;
+    /// The block height from which consensus V3 rules apply.
+    const CONSENSUS_V3_HEIGHT: u32;
+
     /// The function name for the inclusion circuit.
     const INCLUSION_FUNCTION_NAME: &'static str;
 
     /// The fixed timestamp of the genesis block.
     const GENESIS_TIMESTAMP: i64;
     /// The genesis block coinbase target.
-    #[cfg(not(feature = "test"))]
-    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 10).saturating_sub(1);
-    /// The genesis block coinbase target.
-    /// This is deliberately set to a low value (32) for testing purposes only.
-    #[cfg(feature = "test")]
-    const GENESIS_COINBASE_TARGET: u64 = (1u64 << 5).saturating_sub(1);
+    const GENESIS_COINBASE_TARGET: u64;
     /// The genesis block proof target.
-    #[cfg(not(feature = "test"))]
-    const GENESIS_PROOF_TARGET: u64 = 1u64 << 8;
-    /// The genesis block proof target.
-    /// This is deliberately set to a low value (8) for testing purposes only.
-    #[cfg(feature = "test")]
-    const GENESIS_PROOF_TARGET: u64 = 1u64 << 3;
+    const GENESIS_PROOF_TARGET: u64;
     /// The maximum number of solutions that can be included per block as a power of 2.
     const MAX_SOLUTIONS_AS_POWER_OF_TWO: u8 = 2; // 4 solutions
     /// The maximum number of solutions that can be included per block.
@@ -118,6 +114,10 @@ pub trait Network:
     const STARTING_SUPPLY: u64 = 1_500_000_000_000_000; // 1.5B credits
     /// The cost in microcredits per byte for the deployment transaction.
     const DEPLOYMENT_FEE_MULTIPLIER: u64 = 1_000; // 1 millicredit per byte
+    /// The constant that divides the storage polynomial.
+    const EXECUTION_STORAGE_FEE_SCALING_FACTOR: u64 = 5000;
+    /// The maximum size execution transactions can be before a quadratic storage penalty applies.
+    const EXECUTION_STORAGE_PENALTY_THRESHOLD: u64 = 5000;
     /// The cost in microcredits per constraint for the deployment transaction.
     const SYNTHESIS_FEE_MULTIPLIER: u64 = 25; // 25 microcredits per constraint
     /// The maximum number of variables in a deployment.
@@ -194,7 +194,13 @@ pub trait Network:
     /// The maximum number of imports.
     const MAX_IMPORTS: usize = 64;
 
+    /// The maximum number of certificates in a batch before consensus V3 rules apply.
+    const MAX_CERTIFICATES_BEFORE_V3: u16;
     /// The maximum number of certificates in a batch.
+    // Note: This value must **not** be changed without considering the impact on serialization.
+    //  Decreasing this value will break backwards compatibility of serialization without explicit
+    //  declaration of migration based on round number rather than block height.
+    //  Increasing this value will require a migration to prevent forking during network upgrades.
     const MAX_CERTIFICATES: u16;
 
     /// The maximum number of bytes in a transaction.
@@ -211,9 +217,14 @@ pub trait Network:
     type TransactionID: Bech32ID<Field<Self>>;
     /// The transition ID type.
     type TransitionID: Bech32ID<Field<Self>>;
+    /// The transmission checksum type.
+    type TransmissionChecksum: IntegerType;
 
     /// Returns the genesis block bytes.
     fn genesis_bytes() -> &'static [u8];
+
+    /// Returns the restrictions list as a JSON-compatible string.
+    fn restrictions_list_as_str() -> &'static str;
 
     /// Returns the proving key for the given function name in `credits.aleo`.
     fn get_credits_proving_key(function_name: String) -> Result<&'static Arc<VarunaProvingKey<Self>>>;

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -20,23 +21,23 @@ impl Parser for LiteralType {
     fn parse(string: &str) -> ParserResult<Self> {
         // Parse the type from the string.
         alt((
-            map(tag("address"), |_| Self::Address),
-            map(tag("boolean"), |_| Self::Boolean),
-            map(tag("field"), |_| Self::Field),
-            map(tag("group"), |_| Self::Group),
-            map(tag("i8"), |_| Self::I8),
-            map(tag("i16"), |_| Self::I16),
-            map(tag("i32"), |_| Self::I32),
-            map(tag("i64"), |_| Self::I64),
-            map(tag("i128"), |_| Self::I128),
-            map(tag("u8"), |_| Self::U8),
-            map(tag("u16"), |_| Self::U16),
-            map(tag("u32"), |_| Self::U32),
-            map(tag("u64"), |_| Self::U64),
-            map(tag("u128"), |_| Self::U128),
-            map(tag("scalar"), |_| Self::Scalar),
-            map(tag("signature"), |_| Self::Signature),
-            map(tag("string"), |_| Self::String),
+            map(tag(Self::Address.type_name()), |_| Self::Address),
+            map(tag(Self::Boolean.type_name()), |_| Self::Boolean),
+            map(tag(Self::Field.type_name()), |_| Self::Field),
+            map(tag(Self::Group.type_name()), |_| Self::Group),
+            map(tag(Self::I8.type_name()), |_| Self::I8),
+            map(tag(Self::I16.type_name()), |_| Self::I16),
+            map(tag(Self::I32.type_name()), |_| Self::I32),
+            map(tag(Self::I64.type_name()), |_| Self::I64),
+            map(tag(Self::I128.type_name()), |_| Self::I128),
+            map(tag(Self::U8.type_name()), |_| Self::U8),
+            map(tag(Self::U16.type_name()), |_| Self::U16),
+            map(tag(Self::U32.type_name()), |_| Self::U32),
+            map(tag(Self::U64.type_name()), |_| Self::U64),
+            map(tag(Self::U128.type_name()), |_| Self::U128),
+            map(tag(Self::Scalar.type_name()), |_| Self::Scalar),
+            map(tag(Self::Signature.type_name()), |_| Self::Signature),
+            map(tag(Self::String.type_name()), |_| Self::String),
         ))(string)
     }
 }

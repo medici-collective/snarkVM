@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -46,7 +47,7 @@ mod tests {
             // Initialize the input.
             let affine = Group::<Circuit>::new(mode, input);
 
-            Circuit::scope(&format!("{mode} {i}"), || {
+            Circuit::scope(format!("{mode} {i}"), || {
                 let candidate = affine.mul_by_cofactor();
                 assert_eq!(expected, candidate.eject_value());
                 assert_scope!(num_constants, num_public, num_private, num_constraints);
@@ -86,7 +87,7 @@ mod tests {
             // Initialize the input.
             let affine = Group::<Circuit>::new(Mode::Private, input);
 
-            Circuit::scope(&format!("Constant {i}"), || {
+            Circuit::scope(format!("Constant {i}"), || {
                 let candidate =
                     affine * Scalar::constant(console::Scalar::new(<Circuit as Environment>::ScalarField::from(4u128)));
                 assert_eq!(expected, candidate.eject_value());

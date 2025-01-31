@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -86,6 +87,7 @@ impl<N: Network> Deref for PuzzleSolutions<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PartialSolution;
     use console::account::{Address, PrivateKey};
 
     use std::collections::HashSet;
@@ -103,7 +105,8 @@ mod tests {
             let private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
             let address = Address::try_from(private_key).unwrap();
 
-            let solution = Solution::new(rng.gen(), address, u64::rand(rng)).unwrap();
+            let partial_solution = PartialSolution::new(rng.gen(), address, u64::rand(rng)).unwrap();
+            let solution = Solution::new(partial_solution, u64::rand(rng));
             solutions.push(solution);
         }
         PuzzleSolutions::new(solutions).unwrap()

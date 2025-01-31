@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -14,14 +15,14 @@
 
 use crate::{
     polycommit::sonic_pc,
-    snark::varuna::{ahp::indexer::*, CircuitVerifyingKey, SNARKMode},
+    snark::varuna::{CircuitVerifyingKey, SNARKMode, ahp::indexer::*},
 };
 use snarkvm_curves::PairingEngine;
 use snarkvm_utilities::{
-    io::{self, Read, Write},
-    serialize::*,
     FromBytes,
     ToBytes,
+    io::{self, Read, Write},
+    serialize::*,
 };
 
 use std::{cmp::Ordering, sync::Arc};

@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,25 +14,166 @@
 // limitations under the License.
 
 use crate::{
-    advance::split_candidate_solutions,
-    test_helpers::{CurrentLedger, CurrentNetwork},
     Ledger,
     RecordsFilter,
+    advance::split_candidate_solutions,
+    test_helpers::{CurrentAleo, CurrentLedger, CurrentNetwork},
 };
 use aleo_std::StorageMode;
 use console::{
     account::{Address, PrivateKey},
-    network::{prelude::*, MainnetV0},
+    network::{MainnetV0, prelude::*},
     program::{Entry, Identifier, Literal, Plaintext, ProgramID, Value},
     types::U16,
 };
-use ledger_block::{ConfirmedTransaction, Ratify, Rejected, Transaction};
+use ledger_authority::Authority;
+use ledger_block::{Block, ConfirmedTransaction, Execution, Ratify, Rejected, Transaction};
 use ledger_committee::{Committee, MIN_VALIDATOR_STAKE};
-use ledger_store::{helpers::memory::ConsensusMemory, ConsensusStore};
-use synthesizer::{program::Program, vm::VM, Stack};
+use ledger_narwhal::{BatchCertificate, BatchHeader, Data, Subdag, Transmission, TransmissionID};
+use ledger_store::{ConsensusStore, helpers::memory::ConsensusMemory};
+use snarkvm_utilities::try_vm_runtime;
+use synthesizer::{Stack, program::Program, vm::VM};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use rand::seq::SliceRandom;
+use std::collections::{BTreeMap, HashMap};
+use time::OffsetDateTime;
+
+/// Initializes a sample VM.
+fn sample_vm() -> VM<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+    VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None).unwrap()).unwrap()
+}
+
+/// Extract the transmissions from a block.
+fn extract_transmissions(
+    block: &Block<CurrentNetwork>,
+) -> IndexMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>> {
+    let mut transmissions = IndexMap::new();
+    for tx in block.transactions().iter() {
+        let checksum = Data::Object(tx.transaction().clone()).to_checksum::<CurrentNetwork>().unwrap();
+        transmissions.insert(TransmissionID::from((&tx.id(), &checksum)), tx.transaction().clone().into());
+    }
+    if let Some(coinbase_solution) = block.solutions().as_ref() {
+        for (_, solution) in coinbase_solution.iter() {
+            let checksum = Data::Object(*solution).to_checksum::<CurrentNetwork>().unwrap();
+            transmissions.insert(TransmissionID::from((solution.id(), checksum)), (*solution).into());
+        }
+    }
+    transmissions
+}
+
+/// Construct `num_blocks` quorum blocks given a set of validator private keys and the genesis block.
+fn construct_quorum_blocks(
+    private_keys: Vec<PrivateKey<CurrentNetwork>>,
+    genesis: Block<CurrentNetwork>,
+    num_blocks: u64,
+    rng: &mut TestRng,
+) -> Vec<Block<CurrentNetwork>> {
+    // Initialize the ledger with the genesis block.
+    let ledger =
+        Ledger::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::load(genesis.clone(), StorageMode::Production)
+            .unwrap();
+
+    // Initialize the round parameters.
+    assert!(num_blocks > 0);
+    assert!(num_blocks < 25);
+    let rounds_per_commit = 2;
+    let final_round = num_blocks.saturating_mul(rounds_per_commit);
+
+    // Sample rounds of batch certificates starting at the genesis round from a static set of 4 authors.
+    let (round_to_certificates_map, committee) = {
+        let committee = ledger.latest_committee().unwrap();
+        let mut round_to_certificates_map: HashMap<u64, IndexSet<BatchCertificate<CurrentNetwork>>> = HashMap::new();
+        let mut previous_certificates: IndexSet<BatchCertificate<CurrentNetwork>> = IndexSet::with_capacity(4);
+
+        // Create certificates for each round.
+        for round in 1..=final_round {
+            let mut current_certificates = IndexSet::new();
+            let previous_certificate_ids =
+                if round <= 1 { IndexSet::new() } else { previous_certificates.iter().map(|c| c.id()).collect() };
+
+            for (i, private_key_1) in private_keys.iter().enumerate() {
+                let batch_header = BatchHeader::new(
+                    private_key_1,
+                    round,
+                    OffsetDateTime::now_utc().unix_timestamp(),
+                    committee.id(),
+                    Default::default(),
+                    previous_certificate_ids.clone(),
+                    rng,
+                )
+                .unwrap();
+                // Add signatures for the batch headers. This creates a fully connected DAG.
+                let signatures = private_keys
+                    .iter()
+                    .enumerate()
+                    .filter(|&(j, _)| i != j)
+                    .map(|(_, private_key_2)| private_key_2.sign(&[batch_header.batch_id()], rng).unwrap())
+                    .collect();
+                current_certificates.insert(BatchCertificate::from(batch_header, signatures).unwrap());
+            }
+
+            round_to_certificates_map.insert(round, current_certificates.clone());
+            previous_certificates = current_certificates;
+        }
+        (round_to_certificates_map, committee)
+    };
+
+    // Helper function to create a quorum block.
+    fn create_next_quorum_block(
+        ledger: &Ledger<CurrentNetwork, ConsensusMemory<CurrentNetwork>>,
+        round: u64,
+        leader_certificate: &BatchCertificate<CurrentNetwork>,
+        previous_leader_certificate: Option<&BatchCertificate<CurrentNetwork>>,
+        round_to_certificates_map: &HashMap<u64, IndexSet<BatchCertificate<CurrentNetwork>>>,
+        rng: &mut TestRng,
+    ) -> Block<CurrentNetwork> {
+        // Construct the subdag for the block.
+        let mut subdag_map = BTreeMap::new();
+        // Add the leader certificate.
+        subdag_map.insert(round, [leader_certificate.clone()].into());
+        // Add the certificates of the previous round.
+        subdag_map.insert(round - 1, round_to_certificates_map.get(&(round - 1)).unwrap().clone());
+        // Add the certificates from the previous leader round, excluding the previous leader certificate.
+        // This assumes the number of rounds per commit is 2.
+        if let Some(prev_leader_cert) = previous_leader_certificate {
+            let mut previous_leader_round_certificates =
+                round_to_certificates_map.get(&(round - 2)).cloned().unwrap_or_default();
+            previous_leader_round_certificates.shift_remove(prev_leader_cert);
+            subdag_map.insert(round - 2, previous_leader_round_certificates);
+        }
+        // Construct the block.
+        let subdag = Subdag::from(subdag_map).unwrap();
+        let block = ledger.prepare_advance_to_next_quorum_block(subdag, Default::default(), rng).unwrap();
+        ledger.check_next_block(&block, rng).unwrap();
+        block
+    }
+
+    // Track the blocks that are created.
+    let mut blocks = Vec::new();
+    let mut previous_leader_certificate: Option<&BatchCertificate<CurrentNetwork>> = None;
+
+    // Construct the blocks.
+    for block_height in 1..=num_blocks {
+        let round = block_height.saturating_mul(rounds_per_commit);
+        let leader = committee.get_leader(round).unwrap();
+        let leader_certificate =
+            round_to_certificates_map.get(&round).unwrap().iter().find(|c| c.author() == leader).unwrap();
+        let block = create_next_quorum_block(
+            &ledger,
+            round,
+            leader_certificate,
+            previous_leader_certificate,
+            &round_to_certificates_map,
+            rng,
+        );
+        ledger.advance_to_next_block(&block).unwrap();
+        previous_leader_certificate = Some(leader_certificate);
+        blocks.push(block);
+    }
+
+    blocks
+}
 
 #[test]
 fn test_load() {
@@ -779,56 +921,107 @@ fn test_execute_duplicate_input_ids() {
 
     // Fetch the unspent records.
     let records = find_records();
-    let record_1 = records[0].clone();
+    let record_execution = records[0].clone();
+    let record_deployment = records[1].clone();
 
-    // Prepare a transfer that spends the record.
+    // Prepare a transfer that spends a record.
     let inputs = [
-        Value::Record(record_1.clone()),
+        Value::Record(record_execution.clone()),
         Value::from_str(&format!("{address}")).unwrap(),
         Value::from_str("100u64").unwrap(),
     ];
-    let transfer_1 = ledger
-        .vm
-        .execute(&private_key, ("credits.aleo", "transfer_private"), inputs.into_iter(), None, 0, None, rng)
-        .unwrap();
-    let transfer_1_id = transfer_1.id();
 
-    // Prepare a transfer that attempts to spend the same record.
-    let inputs = [
-        Value::Record(record_1.clone()),
-        Value::from_str(&format!("{address}")).unwrap(),
-        Value::from_str("1000u64").unwrap(),
-    ];
-    let transfer_2 = ledger
-        .vm
-        .execute(&private_key, ("credits.aleo", "transfer_private"), inputs.into_iter(), None, 0, None, rng)
-        .unwrap();
-    let transfer_2_id = transfer_2.id();
+    let num_duplicate_deployments = 3;
+    let mut executions = Vec::with_capacity(num_duplicate_deployments + 1);
+    let mut execution_ids = Vec::with_capacity(num_duplicate_deployments + 1);
+    let mut deployments = Vec::with_capacity(num_duplicate_deployments);
+    let mut deployment_ids = Vec::with_capacity(num_duplicate_deployments);
 
-    // Prepare a transfer that attempts to spend the same record in the fee.
+    // Create Executions and Deployments, spending the same record.
+    for i in 0..num_duplicate_deployments {
+        // Execute.
+        let execution = ledger
+            .vm
+            .execute(&private_key, ("credits.aleo", "transfer_private"), inputs.clone().iter(), None, 0, None, rng)
+            .unwrap();
+        execution_ids.push(execution.id());
+        executions.push(execution);
+        // Deploy.
+        let program_id = ProgramID::<CurrentNetwork>::from_str(&format!("dummy_program_{i}.aleo")).unwrap();
+        let program = Program::<CurrentNetwork>::from_str(&format!(
+            "
+program {program_id};
+function foo:
+    input r0 as u8.private;
+    async foo r0 into r1;
+    output r1 as {program_id}/foo.future;
+finalize foo:
+    input r0 as u8.public;
+    add r0 r0 into r1;",
+        ))
+        .unwrap();
+        let deployment =
+            ledger.vm.deploy(&private_key, &program, Some(record_deployment.clone()), 0, None, rng).unwrap();
+        deployment_ids.push(deployment.id());
+        deployments.push(deployment);
+    }
+
+    // Create one more execution which spends the record as a fee.
     let inputs = [Value::from_str(&format!("{address}")).unwrap(), Value::from_str("100u64").unwrap()];
-    let transfer_3 = ledger
+    let execution = ledger
         .vm
         .execute(
             &private_key,
             ("credits.aleo", "transfer_public"),
-            inputs.into_iter(),
-            Some(record_1.clone()),
+            inputs.clone().iter(),
+            Some(record_execution.clone()),
             0,
             None,
             rng,
         )
         .unwrap();
-    let transfer_3_id = transfer_3.id();
+    execution_ids.push(execution.id());
+    executions.push(execution);
 
-    // Prepare a transfer that attempts to spend the same record for the subsequent block.
-    let inputs =
-        [Value::Record(record_1), Value::from_str(&format!("{address}")).unwrap(), Value::from_str("1000u64").unwrap()];
-    let transfer_4 = ledger
+    // Select a transaction to mutate by a malicious validator.
+    let transaction_to_mutate = executions.last().unwrap().clone();
+
+    // Create a mutated execution which adds one transition, resulting in a different transaction id.
+    // This simulates a malicious validator re-using execution content.
+    let execution_to_mutate = transaction_to_mutate.execution().unwrap();
+    // Sample a transition.
+    let sample = ledger_test_helpers::sample_transition(rng);
+    // Extend the transitions.
+    let mutated_transitions = std::iter::once(sample).chain(execution_to_mutate.transitions().cloned());
+    // Create a mutated execution.
+    let mutated_execution = Execution::from(
+        mutated_transitions,
+        execution_to_mutate.global_state_root(),
+        execution_to_mutate.proof().cloned(),
+    )
+    .unwrap();
+    // Create a new fee for the execution.
+    let fee_authorization = ledger
         .vm
-        .execute(&private_key, ("credits.aleo", "transfer_private"), inputs.into_iter(), None, 0, None, rng)
+        .authorize_fee_public(
+            &private_key,
+            *executions.last().unwrap().fee_amount().unwrap(),
+            0,
+            mutated_execution.to_execution_id().unwrap(),
+            rng,
+        )
         .unwrap();
-    let transfer_4_id = transfer_4.id();
+    let fee = ledger.vm.execute_fee_authorization(fee_authorization, None, rng).unwrap();
+    // Create a mutated transaction.
+    let mutated_transaction = Transaction::from_execution(mutated_execution, Some(fee)).unwrap();
+    execution_ids.push(mutated_transaction.id());
+    executions.push(mutated_transaction);
+
+    // Create a mutated execution which just takes the fee transition, resulting in a different transaction id.
+    // This simulates a malicious validator transforming a transaction to a fee transaction.
+    let mutated_transaction = Transaction::from_fee(transaction_to_mutate.fee_transition().unwrap()).unwrap();
+    execution_ids.push(mutated_transaction.id());
+    executions.push(mutated_transaction);
 
     // Create a block.
     let block = ledger
@@ -836,7 +1029,63 @@ fn test_execute_duplicate_input_ids() {
             &private_key,
             vec![],
             vec![],
-            vec![transfer_1, transfer_2, transfer_3],
+            vec![
+                executions.pop().unwrap(),
+                executions.pop().unwrap(),
+                executions.pop().unwrap(),
+                executions.pop().unwrap(),
+                executions.pop().unwrap(),
+                deployments.pop().unwrap(),
+                deployments.pop().unwrap(),
+            ],
+            rng,
+        )
+        .unwrap();
+
+    // Check that the next block is valid.
+    ledger.check_next_block(&block, rng).unwrap();
+
+    // Add the block to the ledger.
+    ledger.advance_to_next_block(&block).unwrap();
+
+    // Enforce that the block transactions were correct.
+    assert_eq!(block.transactions().num_accepted(), 2);
+    println!("execution_ids: {:?}", execution_ids);
+    assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&execution_ids[2], &deployment_ids[2]]);
+    assert_eq!(block.aborted_transaction_ids(), &vec![
+        execution_ids[5],
+        execution_ids[4],
+        execution_ids[3],
+        execution_ids[1],
+        deployment_ids[1]
+    ]);
+
+    // Ensure that verification was not run on aborted deployments.
+    let partially_verified_transaction = ledger.vm().partially_verified_transactions().read().clone();
+
+    assert!(partially_verified_transaction.contains(&execution_ids[2]));
+    assert!(partially_verified_transaction.contains(&deployment_ids[2]));
+    assert!(!partially_verified_transaction.contains(&execution_ids[1]));
+    assert!(!partially_verified_transaction.contains(&deployment_ids[1]));
+    assert!(!partially_verified_transaction.contains(&execution_ids[3]));
+    assert!(!partially_verified_transaction.contains(&execution_ids[4])); // Verification was run, but the execution was invalid.
+    assert!(!partially_verified_transaction.contains(&execution_ids[5]));
+
+    // Prepare a transfer that will succeed for the subsequent block.
+    let inputs = [Value::from_str(&format!("{address}")).unwrap(), Value::from_str("1000u64").unwrap()];
+    let transfer = ledger
+        .vm
+        .execute(&private_key, ("credits.aleo", "transfer_public"), inputs.into_iter(), None, 0, None, rng)
+        .unwrap();
+    let transfer_id = transfer.id();
+
+    // Create a block.
+    let block = ledger
+        .prepare_advance_to_next_beacon_block(
+            &private_key,
+            vec![],
+            vec![],
+            vec![executions.pop().unwrap(), deployments.pop().unwrap(), transfer],
             rng,
         )
         .unwrap();
@@ -849,43 +1098,14 @@ fn test_execute_duplicate_input_ids() {
 
     // Enforce that the block transactions were correct.
     assert_eq!(block.transactions().num_accepted(), 1);
-    assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_1_id]);
-    assert_eq!(block.aborted_transaction_ids(), &vec![transfer_2_id, transfer_3_id]);
+    assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_id]);
+    assert_eq!(block.aborted_transaction_ids(), &vec![execution_ids[0], deployment_ids[0]]);
 
-    // Ensure that verification was not run on aborted transactions.
+    // Ensure that verification was not run on transactions aborted in a previous block.
     let partially_verified_transaction = ledger.vm().partially_verified_transactions().read().clone();
-    assert!(partially_verified_transaction.contains(&transfer_1_id));
-    assert!(!partially_verified_transaction.contains(&transfer_2_id));
-    assert!(!partially_verified_transaction.contains(&transfer_3_id));
-
-    // Prepare a transfer that will succeed for the subsequent block.
-    let inputs = [Value::from_str(&format!("{address}")).unwrap(), Value::from_str("1000u64").unwrap()];
-    let transfer_5 = ledger
-        .vm
-        .execute(&private_key, ("credits.aleo", "transfer_public"), inputs.into_iter(), None, 0, None, rng)
-        .unwrap();
-    let transfer_5_id = transfer_5.id();
-
-    // Create a block.
-    let block = ledger
-        .prepare_advance_to_next_beacon_block(&private_key, vec![], vec![], vec![transfer_4, transfer_5], rng)
-        .unwrap();
-
-    // Check that the next block is valid.
-    ledger.check_next_block(&block, rng).unwrap();
-
-    // Add the block to the ledger.
-    ledger.advance_to_next_block(&block).unwrap();
-
-    // Enforce that the block transactions were correct.
-    assert_eq!(block.transactions().num_accepted(), 1);
-    assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_5_id]);
-    assert_eq!(block.aborted_transaction_ids(), &vec![transfer_4_id]);
-
-    // Ensure that verification was not run on aborted transactions.
-    let partially_verified_transaction = ledger.vm().partially_verified_transactions().read().clone();
-    assert!(partially_verified_transaction.contains(&transfer_5_id));
-    assert!(!partially_verified_transaction.contains(&transfer_4_id));
+    assert!(partially_verified_transaction.contains(&transfer_id));
+    assert!(!partially_verified_transaction.contains(&execution_ids[0]));
+    assert!(!partially_verified_transaction.contains(&deployment_ids[0]));
 }
 
 #[test]
@@ -893,7 +1113,8 @@ fn test_execute_duplicate_output_ids() {
     let rng = &mut TestRng::default();
 
     // Initialize the test environment.
-    let crate::test_helpers::TestEnv { ledger, private_key, address, .. } = crate::test_helpers::sample_test_env(rng);
+    let crate::test_helpers::TestEnv { ledger, private_key, view_key, address, .. } =
+        crate::test_helpers::sample_test_env(rng);
 
     // Deploy a test program to the ledger.
     let program = Program::<CurrentNetwork>::from_str(
@@ -926,8 +1147,25 @@ function create_duplicate_record:
     // Add the block to the ledger.
     ledger.advance_to_next_block(&block).unwrap();
 
-    // Create a transaction with different transition ids, but with a fixed output record (output ID).
-    let mut create_transaction_with_duplicate_output_id = |x: u64| -> Transaction<CurrentNetwork> {
+    // A helper function to find records.
+    let find_records = || {
+        let microcredits = Identifier::from_str("microcredits").unwrap();
+        ledger
+            .find_records(&view_key, RecordsFilter::SlowUnspent(private_key))
+            .unwrap()
+            .filter(|(_, record)| match record.data().get(&microcredits) {
+                Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                _ => false,
+            })
+            .collect::<indexmap::IndexMap<_, _>>()
+    };
+
+    // Fetch the unspent records.
+    let records = find_records();
+    let record_1 = records[0].clone();
+
+    // Create an execution with different transition ids, but with a fixed output record (output ID).
+    let mut create_execution_with_duplicate_output_id = |x: u64| -> Transaction<CurrentNetwork> {
         // Use a fixed seed RNG.
         let fixed_rng = &mut TestRng::from_seed(1);
 
@@ -964,16 +1202,61 @@ function create_duplicate_record:
         Transaction::from_execution(execution, Some(fee)).unwrap()
     };
 
+    // Create an deployment with different transition ids, but with a fixed output record (output ID).
+    let create_deployment_with_duplicate_output_id = |x: u64| -> Transaction<CurrentNetwork> {
+        // Use a fixed seed RNG.
+        let fixed_rng = &mut TestRng::from_seed(1);
+
+        // Deploy a test program to the ledger.
+        let program = Program::<CurrentNetwork>::from_str(&format!(
+            "
+program dummy_program_{x}.aleo;
+
+record dummy_program:
+    owner as address.private;
+    rand_var as u64.private;
+
+function create_duplicate_record:
+    input r0 as u64.private;
+    cast self.caller 1u64 into r1 as dummy_program.record;
+    output r1 as dummy_program.record;"
+        ))
+        .unwrap();
+
+        // Create a transaction with a fixed rng.
+        let transaction = ledger.vm.deploy(&private_key, &program, None, 0, None, fixed_rng).unwrap();
+
+        // Extract the deployment and owner.
+        let deployment = transaction.deployment().unwrap().clone();
+        let owner = *transaction.owner().unwrap();
+
+        // Create a new fee for the execution.
+        let fee_authorization = ledger
+            .vm
+            .authorize_fee_private(
+                &private_key,
+                record_1.clone(),
+                *transaction.fee_amount().unwrap(),
+                0,
+                deployment.to_deployment_id().unwrap(),
+                fixed_rng,
+            )
+            .unwrap();
+        let fee = ledger.vm.execute_fee_authorization(fee_authorization, None, fixed_rng).unwrap();
+
+        Transaction::from_deployment(owner, deployment, fee).unwrap()
+    };
+
     // Create the first transfer.
-    let transfer_1 = create_transaction_with_duplicate_output_id(1);
+    let transfer_1 = create_execution_with_duplicate_output_id(1);
     let transfer_1_id = transfer_1.id();
 
     // Create a second transfer with the same output id.
-    let transfer_2 = create_transaction_with_duplicate_output_id(2);
+    let transfer_2 = create_execution_with_duplicate_output_id(2);
     let transfer_2_id = transfer_2.id();
 
     // Create a third transfer with the same output id.
-    let transfer_3 = create_transaction_with_duplicate_output_id(3);
+    let transfer_3 = create_execution_with_duplicate_output_id(3);
     let transfer_3_id = transfer_3.id();
 
     // Ensure that each transaction has a duplicate output id.
@@ -983,9 +1266,34 @@ function create_duplicate_record:
     assert_eq!(tx_1_output_id, tx_2_output_id);
     assert_eq!(tx_1_output_id, tx_3_output_id);
 
+    // Create the first deployment.
+    let deployment_1 = create_deployment_with_duplicate_output_id(1);
+    let deployment_1_id = deployment_1.id();
+
+    // Create a second deployment with the same output id.
+    let deployment_2 = create_deployment_with_duplicate_output_id(2);
+    let deployment_2_id = deployment_2.id();
+
+    // Create a third deployment with the same output id.
+    let deployment_3 = create_deployment_with_duplicate_output_id(3);
+    let deployment_3_id = deployment_3.id();
+
+    // Ensure that each transaction has a duplicate output id.
+    let deployment_1_output_id = deployment_1.output_ids().next().unwrap();
+    let deployment_2_output_id = deployment_2.output_ids().next().unwrap();
+    let deployment_3_output_id = deployment_3.output_ids().next().unwrap();
+    assert_eq!(deployment_1_output_id, deployment_2_output_id);
+    assert_eq!(deployment_1_output_id, deployment_3_output_id);
+
     // Create a block.
     let block = ledger
-        .prepare_advance_to_next_beacon_block(&private_key, vec![], vec![], vec![transfer_1, transfer_2], rng)
+        .prepare_advance_to_next_beacon_block(
+            &private_key,
+            vec![],
+            vec![],
+            vec![transfer_1, transfer_2, deployment_1, deployment_2],
+            rng,
+        )
         .unwrap();
 
     // Check that the next block is valid.
@@ -995,14 +1303,16 @@ function create_duplicate_record:
     ledger.advance_to_next_block(&block).unwrap();
 
     // Enforce that the block transactions were correct.
-    assert_eq!(block.transactions().num_accepted(), 1);
-    assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_1_id]);
-    assert_eq!(block.aborted_transaction_ids(), &vec![transfer_2_id]);
+    assert_eq!(block.transactions().num_accepted(), 2);
+    assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_1_id, &deployment_1_id]);
+    assert_eq!(block.aborted_transaction_ids(), &vec![transfer_2_id, deployment_2_id]);
 
-    // Ensure that verification was not run on aborted transactions.
+    // Ensure that verification was not run on aborted deployments.
     let partially_verified_transaction = ledger.vm().partially_verified_transactions().read().clone();
     assert!(partially_verified_transaction.contains(&transfer_1_id));
+    assert!(partially_verified_transaction.contains(&deployment_1_id));
     assert!(!partially_verified_transaction.contains(&transfer_2_id));
+    assert!(!partially_verified_transaction.contains(&deployment_2_id));
 
     // Prepare a transfer that will succeed for the subsequent block.
     let inputs = [Value::from_str(&format!("{address}")).unwrap(), Value::from_str("1000u64").unwrap()];
@@ -1014,7 +1324,13 @@ function create_duplicate_record:
 
     // Create a block.
     let block = ledger
-        .prepare_advance_to_next_beacon_block(&private_key, vec![], vec![], vec![transfer_3, transfer_4], rng)
+        .prepare_advance_to_next_beacon_block(
+            &private_key,
+            vec![],
+            vec![],
+            vec![transfer_3, transfer_4, deployment_3],
+            rng,
+        )
         .unwrap();
 
     // Check that the next block is valid.
@@ -1026,12 +1342,13 @@ function create_duplicate_record:
     // Enforce that the block transactions were correct.
     assert_eq!(block.transactions().num_accepted(), 1);
     assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_4_id]);
-    assert_eq!(block.aborted_transaction_ids(), &vec![transfer_3_id]);
+    assert_eq!(block.aborted_transaction_ids(), &vec![transfer_3_id, deployment_3_id]);
 
-    // Ensure that verification was not run on aborted transactions.
+    // Ensure that verification was not run on transactions aborted in a previous block.
     let partially_verified_transaction = ledger.vm().partially_verified_transactions().read().clone();
     assert!(partially_verified_transaction.contains(&transfer_4_id));
     assert!(!partially_verified_transaction.contains(&transfer_3_id));
+    assert!(!partially_verified_transaction.contains(&deployment_3_id));
 }
 
 #[test]
@@ -1067,6 +1384,9 @@ function empty_function:
     ledger.advance_to_next_block(&block).unwrap();
 
     // Create a transaction with different transaction IDs, but with a fixed transition ID.
+    // NOTE: there's no use creating deployments with duplicate (fee) transition ids,
+    //       as this is only possible if they have duplicate programs, duplicate transaction_ids,
+    //       which will not abort but fail on check_next_block.
     let mut create_transaction_with_duplicate_transition_id = || -> Transaction<CurrentNetwork> {
         // Use a fixed seed RNG.
         let fixed_rng = &mut TestRng::from_seed(1);
@@ -1174,7 +1494,7 @@ function empty_function:
     assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_transaction_id]);
     assert_eq!(block.aborted_transaction_ids(), &vec![transaction_3_id]);
 
-    // Ensure that verification was not run on aborted transactions.
+    // Ensure that verification was not run on transactions aborted in a previous block.
     let partially_verified_transaction = ledger.vm().partially_verified_transactions().read().clone();
     assert!(partially_verified_transaction.contains(&transfer_transaction_id));
     assert!(!partially_verified_transaction.contains(&transaction_3_id));
@@ -1215,7 +1535,10 @@ function simple_output:
     // Add the block to the ledger.
     ledger.advance_to_next_block(&block).unwrap();
 
-    // Create a transaction with different transaction ids, but with a TPK.
+    // Create a transaction with different transaction ids, but with a duplicate TPK.
+    // NOTE: there's no use creating deployments with duplicate (fee) TPKs,
+    //       as this is only possible if they have duplicate programs, duplicate transaction_ids,
+    //       which will not abort but fail on check_next_block.
     let mut create_transaction_with_duplicate_tpk = |function: &str| -> Transaction<CurrentNetwork> {
         // Use a fixed seed RNG.
         let fixed_rng = &mut TestRng::from_seed(1);
@@ -1321,7 +1644,7 @@ function simple_output:
     assert_eq!(block.transactions().transaction_ids().collect::<Vec<_>>(), vec![&transfer_transaction_id]);
     assert_eq!(block.aborted_transaction_ids(), &vec![transaction_3_id]);
 
-    // Ensure that verification was not run on aborted transactions.
+    // Ensure that verification was not run on transactions aborted in a previous block.
     let partially_verified_transaction = ledger.vm().partially_verified_transactions().read().clone();
     assert!(partially_verified_transaction.contains(&transfer_transaction_id));
     assert!(!partially_verified_transaction.contains(&transaction_3_id));
@@ -1434,7 +1757,7 @@ fn test_abort_invalid_transaction() {
     let crate::test_helpers::TestEnv { ledger, private_key, address, .. } = crate::test_helpers::sample_test_env(rng);
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None).unwrap()).unwrap();
+    let vm = sample_vm();
 
     // Construct a custom genesis block.
     let custom_genesis = vm.genesis_beacon(&private_key, rng).unwrap();
@@ -1588,7 +1911,7 @@ fn test_split_candidate_solutions() {
         let candidate_solutions: Vec<u8> = rng.sample_iter(Standard).take(num_candidates).collect();
 
         let (_accepted, _aborted) =
-            split_candidate_solutions(candidate_solutions, max_solutions, |candidate| candidate % 2 == 0);
+            split_candidate_solutions(candidate_solutions, max_solutions, |candidate| *candidate % 2 == 0);
     }
 }
 
@@ -1598,10 +1921,10 @@ fn test_max_committee_limit_with_bonds() {
     let rng = &mut TestRng::default();
 
     // Initialize the VM.
-    let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None).unwrap()).unwrap();
+    let vm = sample_vm();
 
     // Construct the validators, one less than the maximum committee size.
-    let validators = (0..Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE - 1)
+    let validators = (0..Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE_BEFORE_V3 - 1)
         .map(|_| {
             let private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
             let amount = MIN_VALIDATOR_STAKE;
@@ -2160,11 +2483,105 @@ finalize is_id:
     ledger.advance_to_next_block(&block_3).unwrap();
 }
 
+#[test]
+fn test_deployment_with_cast_from_field_to_scalar() {
+    // Initialize an RNG.
+    let rng = &mut TestRng::default();
+
+    const ITERATIONS: usize = 10;
+
+    // Construct a program that casts a field to a scalar.
+    let program = Program::<CurrentNetwork>::from_str(
+        r"
+program test_cast_field_to_scalar.aleo;
+function foo:
+    input r0 as field.public;
+    cast r0 into r1 as scalar;",
+    )
+    .unwrap();
+
+    // Constructs a program that has a struct with a field that is cast to a scalar.
+    let program_2 = Program::<CurrentNetwork>::from_str(
+        r"
+program test_cast_f_to_s_struct.aleo;
+
+struct message:
+    first as scalar;
+
+function foo:
+    input r0 as field.public;
+    cast r0 into r1 as scalar;
+    cast r1 into r2 as message;",
+    )
+    .unwrap();
+
+    // Constructs a program that has an array of scalars cast from fields.
+    let program_3 = Program::<CurrentNetwork>::from_str(
+        r"
+program test_cast_f_to_s_array.aleo;
+
+function foo:
+    input r0 as field.public;
+    cast r0 into r1 as scalar;
+    cast r1 r1 r1 r1 into r2 as [scalar; 4u32];",
+    )
+    .unwrap();
+
+    // Initialize the test environment.
+    let crate::test_helpers::TestEnv { ledger, private_key, .. } = crate::test_helpers::sample_test_env(rng);
+
+    // Create a helper method to deploy the programs.
+    let deploy_program = |program: &Program<CurrentNetwork>, rng: &mut TestRng| {
+        let mut attempts = 0;
+        loop {
+            if attempts >= ITERATIONS {
+                panic!("Failed to craft deployment after {ITERATIONS} attempts");
+            }
+            match try_vm_runtime!(|| ledger.vm().deploy(&private_key, program, None, 0, None, rng)) {
+                Ok(result) => break result.unwrap(),
+                Err(_) => attempts += 1,
+            }
+        }
+    };
+
+    // Deploy the programs. Keep attempting to create a deployment until it is successful.
+    let deployment_tx = deploy_program(&program, rng);
+    let deployment_tx_2 = deploy_program(&program_2, rng);
+    let deployment_tx_3 = deploy_program(&program_3, rng);
+
+    // Verify the deployment under different RNGs to ensure the deployment is valid.
+    for _ in 0..ITERATIONS {
+        let process = ledger.vm().process().clone();
+        // Create a helper method to verify the deployments.
+        let verify_deployment = |deployment_tx: &Transaction<CurrentNetwork>, rng: &mut TestRng| {
+            let expected_result = match try_vm_runtime!(|| ledger.vm().check_transaction(deployment_tx, None, rng)) {
+                Ok(result) => result.is_ok(),
+                Err(_) => false,
+            };
+            let deployment = deployment_tx.deployment().unwrap().clone();
+            for _ in 0..ITERATIONS {
+                let result =
+                    match try_vm_runtime!(|| process.read().verify_deployment::<CurrentAleo, _>(&deployment, rng)) {
+                        Ok(result) => result.is_ok(),
+                        Err(_) => false,
+                    };
+                assert_eq!(result, expected_result);
+            }
+        };
+
+        // Verify the deployments.
+        verify_deployment(&deployment_tx, rng);
+        verify_deployment(&deployment_tx_2, rng);
+        verify_deployment(&deployment_tx_3, rng);
+    }
+}
+
 // These tests require the proof targets to be low enough to be able to generate **valid** solutions.
 // This requires the 'test' feature to be enabled for the `console` dependency.
 #[cfg(feature = "test")]
 mod valid_solutions {
     use super::*;
+    use ledger_puzzle::Solution;
     use rand::prelude::SliceRandom;
     use std::collections::HashSet;
 
@@ -2481,5 +2898,247 @@ mod valid_solutions {
         let expected_aborted_solutions =
             candidate_solutions.iter().skip(CurrentNetwork::MAX_SOLUTIONS).map(|s| s.id()).collect::<HashSet<_>>();
         assert_eq!(block_aborted_solution_ids, expected_aborted_solutions, "Aborted solutions do not match");
+    }
+
+    #[test]
+    fn test_malicious_solution() {
+        // Initialize an RNG.
+        let rng = &mut TestRng::default();
+
+        // Initialize the test environment.
+        let crate::test_helpers::TestEnv { ledger, private_key, address, .. } =
+            crate::test_helpers::sample_test_env(rng);
+
+        // Retrieve the puzzle parameters.
+        let puzzle = ledger.puzzle();
+        let latest_epoch_hash = ledger.latest_epoch_hash().unwrap();
+        let minimum_proof_target = ledger.latest_proof_target();
+
+        // Initialize a valid solution object.
+        let mut valid_solution = None;
+        while valid_solution.is_none() {
+            let solution = puzzle.prove(latest_epoch_hash, address, rng.gen(), None).unwrap();
+            if puzzle.get_proof_target(&solution).unwrap() >= minimum_proof_target {
+                valid_solution = Some(solution);
+            }
+        }
+        // Unwrap the valid solution.
+        let valid_solution = valid_solution.unwrap();
+
+        // Construct a malicious solution with a different target.
+        let different_target = valid_solution.target().wrapping_sub(1);
+        let malicious_solution = Solution::new(*valid_solution.partial_solution(), different_target);
+
+        assert_eq!(
+            valid_solution.id(),
+            malicious_solution.id(),
+            "The malicious solution should have the same ID as the valid solution"
+        );
+        assert_ne!(
+            valid_solution.target(),
+            malicious_solution.target(),
+            "The malicious solution should have a different target than the valid solution"
+        );
+
+        // Create a valid transaction for the block.
+        let inputs = [Value::from_str(&format!("{address}")).unwrap(), Value::from_str("10u64").unwrap()];
+        let transfer_transaction = ledger
+            .vm
+            .execute(&private_key, ("credits.aleo", "transfer_public"), inputs.iter(), None, 0, None, rng)
+            .unwrap();
+
+        // Check that the block creation fixes the malformed solution.
+        let expected_solution_id = valid_solution.id();
+        let expected_solution = valid_solution;
+        let mut check_block = |candidate_solutions: Vec<Solution<CurrentNetwork>>| {
+            // Create a block.
+            let block = ledger
+                .prepare_advance_to_next_beacon_block(
+                    &private_key,
+                    vec![],
+                    candidate_solutions.clone(),
+                    vec![transfer_transaction.clone()],
+                    rng,
+                )
+                .unwrap();
+
+            // Check that the next block is valid.
+            ledger.check_next_block(&block, rng).unwrap();
+
+            // Check that the block's solutions are well-formed.
+            assert_eq!(block.solutions().len(), 1);
+            assert_eq!(block.aborted_solution_ids().len(), 0);
+
+            // Fetch the solution from the block.
+            let (solution_id, solution) = block.solutions().as_ref().unwrap().first().unwrap();
+            assert_eq!(*solution_id, expected_solution_id, "Check that the block has the correct solution ID");
+            assert_eq!(*solution, expected_solution, "Check that the block has the correct solution");
+        };
+
+        // Case 1: The malicious solution is included in the block construction.
+        let candidate_solutions = vec![malicious_solution];
+        check_block(candidate_solutions);
+
+        // Case 2: The valid solution is included in the block construction.
+        let candidate_solutions = vec![valid_solution];
+        check_block(candidate_solutions);
+    }
+
+    #[test]
+    fn test_solution_with_insufficient_target() {
+        // Initialize an RNG.
+        let rng = &mut TestRng::default();
+
+        // Initialize the test environment.
+        let crate::test_helpers::TestEnv { ledger, private_key, address, .. } =
+            crate::test_helpers::sample_test_env(rng);
+
+        // Retrieve the puzzle parameters.
+        let puzzle = ledger.puzzle();
+        let latest_epoch_hash = ledger.latest_epoch_hash().unwrap();
+        let minimum_proof_target = ledger.latest_proof_target();
+
+        // Initialize a valid solution object.
+        let mut invalid_solution = None;
+        while invalid_solution.is_none() {
+            let solution = puzzle.prove(latest_epoch_hash, address, rng.gen(), None).unwrap();
+            if puzzle.get_proof_target(&solution).unwrap() < minimum_proof_target {
+                invalid_solution = Some(solution);
+            }
+        }
+        // Unwrap the invalid solution.
+        let invalid_solution = invalid_solution.unwrap();
+
+        // Create a valid transaction for the block.
+        let inputs = [Value::from_str(&format!("{address}")).unwrap(), Value::from_str("10u64").unwrap()];
+        let transfer_transaction = ledger
+            .vm
+            .execute(&private_key, ("credits.aleo", "transfer_public"), inputs.iter(), None, 0, None, rng)
+            .unwrap();
+
+        // Create a block.
+        let block = ledger
+            .prepare_advance_to_next_beacon_block(
+                &private_key,
+                vec![],
+                vec![invalid_solution],
+                vec![transfer_transaction],
+                rng,
+            )
+            .unwrap();
+
+        // Check that the next block is valid.
+        ledger.check_next_block(&block, rng).unwrap();
+
+        // Add the deployment block to the ledger.
+        ledger.advance_to_next_block(&block).unwrap();
+
+        // Check that the block's solutions are well-formed.
+        assert_eq!(block.solutions().len(), 0);
+        assert_eq!(block.aborted_solution_ids().len(), 1);
+
+        // Check that the aborted solution is correct.
+        let block_aborted_solution_id = block.aborted_solution_ids().first().unwrap();
+        assert_eq!(*block_aborted_solution_id, invalid_solution.id(), "Aborted solutions do not match");
+    }
+}
+
+#[test]
+fn test_forged_block_subdags() {
+    let rng = &mut TestRng::default();
+
+    // Sample the genesis private key.
+    let private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
+    // Initialize the store.
+    let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
+    // Create a genesis block with a seeded RNG to reproduce the same genesis private keys.
+    let seed: u64 = rng.gen();
+    let genesis_rng = &mut TestRng::from_seed(seed);
+    let genesis = VM::from(store).unwrap().genesis_beacon(&private_key, genesis_rng).unwrap();
+
+    // Extract the private keys from the genesis committee by using the same RNG to sample private keys.
+    let genesis_rng = &mut TestRng::from_seed(seed);
+    let private_keys = [
+        private_key,
+        PrivateKey::new(genesis_rng).unwrap(),
+        PrivateKey::new(genesis_rng).unwrap(),
+        PrivateKey::new(genesis_rng).unwrap(),
+    ];
+
+    // Construct 3 quorum blocks.
+    let mut quorum_blocks = construct_quorum_blocks(private_keys.to_vec(), genesis.clone(), 3, rng);
+
+    // Extract the individual blocks.
+    let block_1 = quorum_blocks.remove(0);
+    let block_2 = quorum_blocks.remove(0);
+    let block_3 = quorum_blocks.remove(0);
+
+    // Construct the ledger.
+    let ledger =
+        Ledger::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::load(genesis, StorageMode::Production).unwrap();
+    ledger.advance_to_next_block(&block_1).unwrap();
+    ledger.check_next_block(&block_2, rng).unwrap();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Attack 1: Forge block 2' with the subdag of block 3.
+    ////////////////////////////////////////////////////////////////////////////
+    {
+        let block_3_subdag =
+            if let Authority::Quorum(subdag) = block_3.authority() { subdag } else { unreachable!("") };
+
+        // Fetch the transmissions.
+        let transmissions = extract_transmissions(&block_3);
+
+        // Forge the block.
+        let forged_block_2 = ledger
+            .prepare_advance_to_next_quorum_block(block_3_subdag.clone(), transmissions, &mut rand::thread_rng())
+            .unwrap();
+
+        assert_ne!(forged_block_2, block_2);
+
+        // Attempt to verify the forged block.
+        assert!(ledger.check_next_block(&forged_block_2, &mut rand::thread_rng()).is_err());
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Attack 2: Forge block 2' with the combined subdag of block 2 and 3.
+    ////////////////////////////////////////////////////////////////////////////
+    {
+        // Fetch the subdags.
+        let block_2_subdag =
+            if let Authority::Quorum(subdag) = block_2.authority() { subdag } else { unreachable!("") };
+        let block_3_subdag =
+            if let Authority::Quorum(subdag) = block_3.authority() { subdag } else { unreachable!("") };
+
+        // Combined the subdags.
+        let mut combined_subdag = block_2_subdag.deref().clone();
+        for (round, certificates) in block_3_subdag.iter() {
+            combined_subdag
+                .entry(*round)
+                .and_modify(|c| c.extend(certificates.clone()))
+                .or_insert(certificates.clone());
+        }
+
+        // Fetch the transmissions.
+        let block_2_transmissions = extract_transmissions(&block_2);
+        let block_3_transmissions = extract_transmissions(&block_3);
+
+        // Combine the transmissions.
+        let mut combined_transmissions = block_2_transmissions;
+        combined_transmissions.extend(block_3_transmissions);
+
+        // Forge the block.
+        let forged_block_2_from_both_subdags = ledger
+            .prepare_advance_to_next_quorum_block(
+                Subdag::from(combined_subdag).unwrap(),
+                combined_transmissions,
+                &mut rand::thread_rng(),
+            )
+            .unwrap();
+
+        assert_ne!(forged_block_2_from_both_subdags, block_1);
+
+        // Attempt to verify the forged block.
+        assert!(ledger.check_next_block(&forged_block_2_from_both_subdags, &mut rand::thread_rng()).is_err());
     }
 }

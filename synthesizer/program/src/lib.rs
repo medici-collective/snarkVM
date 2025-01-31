@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkVM library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -48,24 +49,13 @@ mod serialize;
 
 use console::{
     network::prelude::{
-        alt,
-        anyhow,
-        bail,
-        de,
-        ensure,
-        error,
-        fmt,
-        many0,
-        many1,
-        map,
-        map_res,
-        tag,
-        take,
         Debug,
         Deserialize,
         Deserializer,
         Display,
+        Err,
         Error,
+        ErrorKind,
         Formatter,
         FromBytes,
         FromBytesDeserializer,
@@ -83,6 +73,19 @@ use console::{
         ToBytesSerializer,
         TypeName,
         Write,
+        anyhow,
+        bail,
+        de,
+        ensure,
+        error,
+        fmt,
+        make_error,
+        many0,
+        many1,
+        map,
+        map_res,
+        tag,
+        take,
     },
     program::{Identifier, PlaintextType, ProgramID, RecordType, StructType},
 };
@@ -265,7 +268,7 @@ impl<N: Network, Instruction: InstructionTrait<N>, Command: CommandTrait<N>> Pro
 
     /// Returns the function with the given name.
     pub fn get_function(&self, name: &Identifier<N>) -> Result<FunctionCore<N, Instruction, Command>> {
-        self.get_function_ref(name).map(|function| function.clone())
+        self.get_function_ref(name).cloned()
     }
 
     /// Returns a reference to the function with the given name.
@@ -805,9 +808,17 @@ function swap:
         assert_eq!(function.inputs().len(), 2);
         assert_eq!(function.input_types().len(), 2);
 
+        // Declare the expected input types.
+        let expected_input_type_1 = ValueType::ExternalRecord(Locator::from_str("eth.aleo/eth")?);
+        let expected_input_type_2 = ValueType::ExternalRecord(Locator::from_str("usdc.aleo/usdc")?);
+
         // Ensure the inputs are external records.
-        assert_eq!(function.input_types()[0], ValueType::ExternalRecord(Locator::from_str("eth.aleo/eth")?));
-        assert_eq!(function.input_types()[1], ValueType::ExternalRecord(Locator::from_str("usdc.aleo/usdc")?));
+        assert_eq!(function.input_types()[0], expected_input_type_1);
+        assert_eq!(function.input_types()[1], expected_input_type_2);
+
+        // Ensure the input variants are correct.
+        assert_eq!(function.input_types()[0].variant(), expected_input_type_1.variant());
+        assert_eq!(function.input_types()[1].variant(), expected_input_type_2.variant());
 
         // Ensure there are two instructions.
         assert_eq!(function.instructions().len(), 2);
@@ -820,9 +831,17 @@ function swap:
         assert_eq!(function.outputs().len(), 2);
         assert_eq!(function.output_types().len(), 2);
 
+        // Declare the expected output types.
+        let expected_output_type_1 = ValueType::ExternalRecord(Locator::from_str("eth.aleo/eth")?);
+        let expected_output_type_2 = ValueType::ExternalRecord(Locator::from_str("usdc.aleo/usdc")?);
+
         // Ensure the outputs are external records.
-        assert_eq!(function.output_types()[0], ValueType::ExternalRecord(Locator::from_str("eth.aleo/eth")?));
-        assert_eq!(function.output_types()[1], ValueType::ExternalRecord(Locator::from_str("usdc.aleo/usdc")?));
+        assert_eq!(function.output_types()[0], expected_output_type_1);
+        assert_eq!(function.output_types()[1], expected_output_type_2);
+
+        // Ensure the output variants are correct.
+        assert_eq!(function.output_types()[0].variant(), expected_output_type_1.variant());
+        assert_eq!(function.output_types()[1].variant(), expected_output_type_2.variant());
 
         Ok(())
     }

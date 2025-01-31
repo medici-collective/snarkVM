@@ -464,6 +464,7 @@ impl<N: Network, C: ConsensusStorage<N>> VM<N, C> {
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::*;
+    use circuit::AleoV0;
     use console::{
         account::{Address, ViewKey},
         network::MainnetV0,
@@ -484,6 +485,7 @@ pub(crate) mod test_helpers {
     use synthesizer_snark::VerifyingKey;
 
     pub(crate) type CurrentNetwork = MainnetV0;
+    type CurrentAleo = AleoV0;
 
     /// Samples a new finalize state.
     pub(crate) fn sample_finalize_state(block_height: u32) -> FinalizeGlobalState {
@@ -2543,6 +2545,92 @@ finalize transfer_public_to_private:
 
         // Ensure this call succeeds.
         vm.puzzle.prove(rng.gen(), rng.gen(), rng.gen(), None).unwrap();
+    }
+
+    #[test]
+    fn test_multi_transition_authorization_deserialization() {
+        let rng = &mut TestRng::default();
+
+        // Initialize a private key.
+        let private_key = sample_genesis_private_key(rng);
+
+        // Initialize the genesis block.
+        let genesis = sample_genesis_block(rng);
+
+        // Initialize the VM.
+        let vm = sample_vm();
+        // Update the VM.
+        vm.add_next_block(&genesis).unwrap();
+
+        // Deploy the base program.
+        let child_program = Program::from_str(
+            r"
+program child_program.aleo;
+
+function check:
+    input r0 as field.private;
+    assert.eq r0 123456789123456789123456789123456789123456789123456789field;
+        ",
+        )
+        .unwrap();
+
+        let deployment = vm.deploy(&private_key, &child_program, None, 0, None, rng).unwrap();
+        assert!(vm.check_transaction(&deployment, None, rng).is_ok());
+        vm.add_next_block(&sample_next_block(&vm, &private_key, &[deployment], rng).unwrap()).unwrap();
+
+        // Check that program is deployed.
+        assert!(vm.contains_program(&ProgramID::from_str("child_program.aleo").unwrap()));
+
+        // Deploy the program that calls the program from the previous layer.
+        let parent_program = Program::from_str(
+            r"
+import child_program.aleo;
+
+program parent_program.aleo;
+
+function check:
+    input r0 as field.private;
+    call child_program.aleo/check r0;
+        ",
+        )
+        .unwrap();
+
+        let deployment = vm.deploy(&private_key, &parent_program, None, 0, None, rng).unwrap();
+        assert!(vm.check_transaction(&deployment, None, rng).is_ok());
+        vm.add_next_block(&sample_next_block(&vm, &private_key, &[deployment], rng).unwrap()).unwrap();
+
+        // Check that program is deployed.
+        assert!(vm.contains_program(&ProgramID::from_str("parent_program.aleo").unwrap()));
+
+        // Initialize the process.
+        let mut process = Process::<CurrentNetwork>::load().unwrap();
+
+        // Load the child and parent program
+        process.add_program(&child_program).unwrap();
+        process.add_program(&parent_program).unwrap();
+
+        // Specify the function name on the parent program
+        let function_name = Identifier::<CurrentNetwork>::from_str("check").unwrap();
+
+        // Generate a random Field for input
+        let input = Value::<CurrentNetwork>::from_str(&Field::<CurrentNetwork>::rand(rng).to_string()).unwrap();
+
+        // Generate the authorization that will contain multiple transitions
+        let authorization = process
+            .authorize::<CurrentAleo, _>(&private_key, parent_program.id(), &function_name, vec![input].iter(), rng)
+            .unwrap();
+
+        // Assert the Authorization has more than 1 transitions
+        assert!(authorization.transitions().len() > 1);
+
+        // Serialize the Authorization into a String
+        let authorization_serialized = authorization.to_string();
+
+        // Attempt to deserialize the Authorization from String
+        let deserialization_result = Authorization::<CurrentNetwork>::from_str(&authorization_serialized);
+
+        // Assert that the deserialization result is Ok
+        assert!(deserialization_result.is_ok());
     }
 
     #[cfg(feature = "rocks")]
